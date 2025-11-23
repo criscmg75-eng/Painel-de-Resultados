@@ -1,0 +1,5 @@
+{
+  "name": "Painel de Resultados",
+  "description": "Uma aplicação para apresentação de resultados em formato de tabela, com gerenciamento de usuários e parâmetros do sistema para administradores.",
+  "requestFramePermissions": []
+}
