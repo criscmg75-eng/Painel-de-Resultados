@@ -9,7 +9,7 @@ interface DataLoadingProps {
 }
 
 const ImportIcon = () => (
-  <svg xmlns="http://www.w.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
     <polyline points="17 8 12 3 7 8" />
     <line x1="12" y1="3" x2="12" y2="15" />
@@ -62,47 +62,75 @@ const DataLoading: React.FC<DataLoadingProps> = ({ setView }) => {
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (!file) {
+      return;
+    }
 
     const reader = new FileReader();
-    reader.onload = async (e) => {
-      const text = e.target?.result as string;
-      const lines = text.split('\n').filter(line => line.trim() !== '');
-      if (lines.length === 0) {
-        alert("O arquivo está vazio ou em formato incorreto.");
-        return;
-      }
-      const importedData: Omit<ProductivityData, 'id'>[] = lines.map((line) => {
-        const [mes, semana, area, zona, dvv, resultado, ab] = line.split('\t');
-        return { mes, semana, area, zona, dvv, resultado, ab };
-      });
-      
-      if (window.confirm(`Você está prestes a substituir TODOS os dados de produtividade por ${importedData.length} novos registros. Deseja continuar?`)) {
-        try {
-          setLoading(true);
-          const dataCollectionRef = collection(db, 'productivityData');
-          const querySnapshot = await getDocs(dataCollectionRef);
-          const batch = writeBatch(db);
-          
-          querySnapshot.forEach(document => {
-              batch.delete(document.ref);
-          });
 
-          importedData.forEach(itemData => {
-              const newDocRef = doc(dataCollectionRef);
-              batch.set(newDocRef, itemData);
-          });
-          
-          await batch.commit();
-          alert(`${importedData.length} registros importados com sucesso!`);
-        } catch (error) {
-            console.error("Error importing data:", error);
-            alert("Ocorreu um erro ao importar os dados. Verifique as regras de segurança do Firebase.");
-        } finally {
-            setLoading(false);
+    reader.onerror = () => {
+      alert('Falha ao ler o arquivo. Verifique se o arquivo não está corrompido.');
+    };
+
+    reader.onload = async (e) => {
+      try {
+        const text = e.target?.result;
+        if (typeof text !== 'string') {
+          alert("Não foi possível ler o conteúdo do arquivo como texto.");
+          return;
         }
+
+        const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
+        if (lines.length === 0) {
+          alert("O arquivo está vazio ou não contém dados válidos.");
+          return;
+        }
+
+        const importedData: Omit<ProductivityData, 'id'>[] = lines.map((line) => {
+          const parts = line.split('\t').map(s => s.trim());
+          const [
+              mes = '', 
+              semana = '', 
+              area = '', 
+              zona = '', 
+              dvv = '', 
+              resultado = '', 
+              ab = ''
+          ] = parts;
+          return { mes, semana, area, zona, dvv, resultado, ab };
+        });
+        
+        if (window.confirm(`Você está prestes a substituir TODOS os dados de produtividade por ${importedData.length} novos registros. Deseja continuar?`)) {
+          setLoading(true);
+          try {
+            const dataCollectionRef = collection(db, 'productivityData');
+            const querySnapshot = await getDocs(dataCollectionRef);
+            const batch = writeBatch(db);
+            
+            querySnapshot.forEach(document => {
+                batch.delete(document.ref);
+            });
+
+            importedData.forEach(itemData => {
+                const newDocRef = doc(dataCollectionRef);
+                batch.set(newDocRef, itemData);
+            });
+            
+            await batch.commit();
+            alert(`${importedData.length} registros importados com sucesso!`);
+          } catch (error: any) {
+              console.error("Error importing data to Firebase:", error);
+              alert(`Ocorreu um erro ao importar os dados para o Firebase:\n\n${error.message}\n\nVerifique as regras de segurança e sua conexão.`);
+          } finally {
+              setLoading(false);
+          }
+        }
+      } catch (processingError: any) {
+        console.error("Error processing file content:", processingError);
+        alert(`Ocorreu um erro ao processar o arquivo:\n\n${processingError.message}`);
       }
     };
+    
     reader.readAsText(file);
     if (event.target) {
         event.target.value = '';

@@ -22,9 +22,11 @@ const PivotTable: React.FC<PivotTableProps> = ({ data, target, title }) => {
             return { headers: [], rows: [] };
         }
 
-        // FIX: Use Array.from(new Set(...)) to ensure proper type inference and avoid 'unknown' type for array elements.
-        const dvvHeaders = Array.from(new Set(data.map(item => item.dvv))).sort((a,b) => Number(a) - Number(b));
-        const zonas = Array.from(new Set(data.map(item => item.zona))).sort();
+        // Fix: Explicitly type dvvHeaders and zonas as string arrays.
+        // This resolves an issue where TypeScript infers them as 'unknown[]' from the Set,
+        // causing an error when their elements are used as index keys.
+        const dvvHeaders: string[] = [...new Set(data.map(item => item.dvv))].sort((a,b) => Number(a) - Number(b));
+        const zonas: string[] = [...new Set(data.map(item => item.zona))].sort();
 
         const rows = zonas.map(zona => {
             const dvvResults = dvvHeaders.reduce<Record<string, { resultado: string; ab: string } | null>>((acc, dvv) => {
