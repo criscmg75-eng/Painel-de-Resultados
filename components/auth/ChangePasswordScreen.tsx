@@ -2,14 +2,14 @@ import React, { useState } from 'react';
 import { User, View } from '../../types';
 import Input from '../ui/Input';
 import Button from '../ui/Button';
-import useLocalStorage from '../../hooks/useLocalStorage';
 
 interface ChangePasswordScreenProps {
+  users: User[];
+  setUsers: (users: User[]) => void;
   setView: (view: View) => void;
 }
 
-const ChangePasswordScreen: React.FC<ChangePasswordScreenProps> = ({ setView }) => {
-  const [users, setUsers] = useLocalStorage<User[]>('users', []);
+const ChangePasswordScreen: React.FC<ChangePasswordScreenProps> = ({ users, setUsers, setView }) => {
   const [username, setUsername] = useState('');
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -31,7 +31,7 @@ const ChangePasswordScreen: React.FC<ChangePasswordScreenProps> = ({ setView }) 
     }
 
     const user = users[userIndex];
-    if (user.senha !== oldPassword) {
+    if (user.senha !== oldPassword && !(user.senha === '' && oldPassword === '')) {
       setError('Senha antiga incorreta.');
       return;
     }
@@ -78,7 +78,9 @@ const ChangePasswordScreen: React.FC<ChangePasswordScreenProps> = ({ setView }) 
         />
         {error && <p className="text-red-500 text-sm text-center">{error}</p>}
         {message && <p className="text-green-500 text-sm text-center">{message}</p>}
-        <Button type="submit">Confirmar Alteração</Button>
+        <Button type="submit">
+            Confirmar Alteração
+        </Button>
       </form>
       <div className="text-center">
         <button

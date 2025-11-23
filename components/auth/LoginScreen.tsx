@@ -2,15 +2,14 @@ import React, { useState } from 'react';
 import { User, View } from '../../types';
 import Input from '../ui/Input';
 import Button from '../ui/Button';
-import useLocalStorage from '../../hooks/useLocalStorage';
 
 interface LoginScreenProps {
+  users: User[];
   setView: (view: View) => void;
   onLogin: (user: User) => void;
 }
 
-const LoginScreen: React.FC<LoginScreenProps> = ({ setView, onLogin }) => {
-  const [users] = useLocalStorage<User[]>('users', []);
+const LoginScreen: React.FC<LoginScreenProps> = ({ users, setView, onLogin }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -21,8 +20,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ setView, onLogin }) => {
       (u) => u.zona.toLowerCase() === username.toLowerCase()
     );
 
-    if (user && user.senha === password) {
-      setError('');
+    if (user && (user.senha === password || (user.senha === '' && password === ''))) {
       onLogin(user);
     } else {
       setError('Usuário ou senha inválidos.');
@@ -50,7 +48,9 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ setView, onLogin }) => {
           onChange={(e) => setPassword(e.target.value)}
         />
         {error && <p className="text-red-500 text-sm text-center">{error}</p>}
-        <Button type="submit">Entrar</Button>
+        <Button type="submit">
+            Entrar
+        </Button>
       </form>
       <div className="text-center">
         <button

@@ -34,6 +34,8 @@ const PivotTable: React.FC<PivotTableProps> = ({ data, target, title }) => {
         const zonas = [...new Set(data.map(item => item.zona))].sort();
 
         const rows = zonas.map(zona => {
+            // FIX: Explicitly type the initial value of the reduce function's accumulator.
+            // This allows TypeScript to correctly infer the type for `acc` and avoids indexing errors.
             const dvvResults = dvvHeaders.reduce((acc, dvv) => {
                 const item = data.find(d => d.zona === zona && d.dvv === dvv);
                 if (item) {

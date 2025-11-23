@@ -1,7 +1,9 @@
 
-import { useState, useEffect } from 'react';
 
-function useLocalStorage<T,>(key: string, initialValue: T): [T, React.Dispatch<React.SetStateAction<T>>] {
+import { useState, useEffect, Dispatch, SetStateAction } from 'react';
+
+// Fix: Imported Dispatch and SetStateAction from react and used them to type the return value. Removed trailing comma from generic.
+function useLocalStorage<T>(key: string, initialValue: T): [T, Dispatch<SetStateAction<T>>] {
   const [storedValue, setStoredValue] = useState<T>(() => {
     try {
       const item = window.localStorage.getItem(key);

@@ -1,12 +1,12 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { User, View } from '../../types';
-import useLocalStorage from '../../hooks/useLocalStorage';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
 import Modal from '../ui/Modal';
 
 interface UserManagementProps {
+  users: User[];
+  setUsers: (users: User[]) => void;
   setView: (view: View) => void;
 }
 
@@ -26,8 +26,7 @@ const ExportIcon = () => (
   </svg>
 );
 
-const UserManagement: React.FC<UserManagementProps> = ({ setView }) => {
-  const [users, setUsers] = useLocalStorage<User[]>('users', []);
+const UserManagement: React.FC<UserManagementProps> = ({ users, setUsers, setView }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [formData, setFormData] = useState<Omit<User, 'id'>>({
@@ -40,12 +39,8 @@ const UserManagement: React.FC<UserManagementProps> = ({ setView }) => {
 
   useEffect(() => {
     if (currentUser) {
-      setFormData({
-        zona: currentUser.zona,
-        area: currentUser.area,
-        telefone: currentUser.telefone,
-        senha: currentUser.senha,
-      });
+      const { id, ...data } = currentUser;
+      setFormData(data);
     } else {
       setFormData({ zona: '', area: '', telefone: '', senha: '' });
     }
@@ -80,26 +75,23 @@ const UserManagement: React.FC<UserManagementProps> = ({ setView }) => {
     e.preventDefault();
     if (currentUser) {
       // Edit user
-      setUsers(
-        users.map((u) => (u.id === currentUser.id ? { ...formData, id: u.id } : u))
-      );
+      setUsers(users.map(u => u.id === currentUser.id ? { ...formData, id: u.id } : u));
     } else {
       // Add user
-      setUsers([...users, { ...formData, id: new Date().toISOString() }]);
+      const newUser = { ...formData, id: `user-${Date.now()}` };
+      setUsers([...users, newUser]);
     }
     handleCloseModal();
   };
 
   const handleDelete = (userId: string) => {
+    const userToDelete = users.find(u => u.id === userId);
+    if (userToDelete?.zona.toUpperCase() === 'ADMIN') {
+        alert('Não é possível excluir o usuário Administrador.');
+        return;
+    }
     if (window.confirm('Tem certeza que deseja excluir este usuário?')) {
-      setUsers(prevUsers => {
-        const userToDelete = prevUsers.find(u => u.id === userId);
-        if (userToDelete?.zona.toUpperCase() === 'ADMIN') {
-            alert('Não é possível excluir o usuário Administrador.');
-            return prevUsers;
-        }
-        return prevUsers.filter((u) => u.id !== userId);
-      });
+        setUsers(prevUsers => prevUsers.filter(user => user.id !== userId));
     }
   };
 
@@ -121,13 +113,6 @@ const UserManagement: React.FC<UserManagementProps> = ({ setView }) => {
         return;
       }
       
-      const adminUser = users.find(u => u.zona.toUpperCase() === 'ADMIN');
-      if (!adminUser) {
-        alert("Erro: Usuário ADMIN não encontrado. A importação não pode continuar.");
-        return;
-      }
-      
-      // Skip header line if it exists
       const dataLines = lines[0].toUpperCase().startsWith('ZONA') ? lines.slice(1) : lines;
 
       const importedUsers: User[] = dataLines.map((line, index) => {
@@ -142,7 +127,9 @@ const UserManagement: React.FC<UserManagementProps> = ({ setView }) => {
       }).filter(u => u.zona);
 
       if (window.confirm(`Você está prestes a substituir todos os usuários (exceto o ADMIN) por ${importedUsers.length} novos registros. Deseja continuar?`)) {
-          setUsers([adminUser, ...importedUsers]);
+          const adminUser = users.find(u => u.zona.toUpperCase() === 'ADMIN');
+          const finalUsers = adminUser ? [adminUser, ...importedUsers] : importedUsers;
+          setUsers(finalUsers);
           alert(`${importedUsers.length} usuários importados com sucesso!`);
       }
     };
@@ -208,13 +195,13 @@ const UserManagement: React.FC<UserManagementProps> = ({ setView }) => {
           <tbody>
             {users.map((user) => (
               <tr key={user.id} className="bg-white border-b">
-                <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">{user.zona}</td>
-                <td className="px-6 py-4">{user.area}</td>
-                <td className="px-6 py-4">{user.telefone}</td>
-                <td className="px-6 py-4 flex space-x-2">
+                  <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">{user.zona}</td>
+                  <td className="px-6 py-4">{user.area}</td>
+                  <td className="px-6 py-4">{user.telefone}</td>
+                  <td className="px-6 py-4 flex space-x-2">
                   <button onClick={() => handleOpenModal(user)} className="font-medium text-indigo-600 hover:underline">Editar</button>
                   <button onClick={() => handleDelete(user.id)} className="font-medium text-red-600 hover:underline">Excluir</button>
-                </td>
+                  </td>
               </tr>
             ))}
           </tbody>
