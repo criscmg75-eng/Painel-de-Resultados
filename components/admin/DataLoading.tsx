@@ -1,6 +1,7 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
+import { collection, onSnapshot, getDocs, writeBatch, doc } from 'firebase/firestore';
+import { db } from '../../firebaseConfig';
 import { ProductivityData, View } from '../../types';
-import useLocalStorage from '../../hooks/useLocalStorage';
 import Button from '../ui/Button';
 
 interface DataLoadingProps {
@@ -8,7 +9,7 @@ interface DataLoadingProps {
 }
 
 const ImportIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg xmlns="http://www.w.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
     <polyline points="17 8 12 3 7 8" />
     <line x1="12" y1="3" x2="12" y2="15" />
@@ -32,8 +33,28 @@ const DeleteIcon = () => (
 
 
 const DataLoading: React.FC<DataLoadingProps> = ({ setView }) => {
-  const [data, setData] = useLocalStorage<ProductivityData[]>('productivityData', []);
+  const [data, setData] = useState<ProductivityData[]>([]);
+  const [loading, setLoading] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setLoading(true);
+    const dataCollectionRef = collection(db, 'productivityData');
+    const unsubscribe = onSnapshot(dataCollectionRef, (snapshot) => {
+      const dataList = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as ProductivityData));
+      setData(dataList);
+      setLoading(false);
+    }, (error) => {
+      console.error("Firebase snapshot error:", error);
+      alert("Falha ao carregar os dados. Verifique a conexão e as regras de segurança do Firebase.");
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const handleImportClick = () => {
     fileInputRef.current?.click();
@@ -44,18 +65,45 @@ const DataLoading: React.FC<DataLoadingProps> = ({ setView }) => {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       const text = e.target?.result as string;
       const lines = text.split('\n').filter(line => line.trim() !== '');
-      const importedData: ProductivityData[] = lines.map((line, index) => {
-        const [mes, semana, area, zona, dvv, resultado, ab] = line.split('\t'); // Assuming tab-separated
-        return { id: `imported-${Date.now()}-${index}`, mes, semana, area, zona, dvv, resultado, ab };
+      if (lines.length === 0) {
+        alert("O arquivo está vazio ou em formato incorreto.");
+        return;
+      }
+      const importedData: Omit<ProductivityData, 'id'>[] = lines.map((line) => {
+        const [mes, semana, area, zona, dvv, resultado, ab] = line.split('\t');
+        return { mes, semana, area, zona, dvv, resultado, ab };
       });
-      setData(importedData);
-      alert(`${importedData.length} registros importados com sucesso!`);
+      
+      if (window.confirm(`Você está prestes a substituir TODOS os dados de produtividade por ${importedData.length} novos registros. Deseja continuar?`)) {
+        try {
+          setLoading(true);
+          const dataCollectionRef = collection(db, 'productivityData');
+          const querySnapshot = await getDocs(dataCollectionRef);
+          const batch = writeBatch(db);
+          
+          querySnapshot.forEach(document => {
+              batch.delete(document.ref);
+          });
+
+          importedData.forEach(itemData => {
+              const newDocRef = doc(dataCollectionRef);
+              batch.set(newDocRef, itemData);
+          });
+          
+          await batch.commit();
+          alert(`${importedData.length} registros importados com sucesso!`);
+        } catch (error) {
+            console.error("Error importing data:", error);
+            alert("Ocorreu um erro ao importar os dados. Verifique as regras de segurança do Firebase.");
+        } finally {
+            setLoading(false);
+        }
+      }
     };
     reader.readAsText(file);
-    // Reset file input
     if (event.target) {
         event.target.value = '';
     }
@@ -79,10 +127,22 @@ const DataLoading: React.FC<DataLoadingProps> = ({ setView }) => {
     URL.revokeObjectURL(link.href);
   };
 
-  const handleDeleteAll = () => {
+  const handleDeleteAll = async () => {
     if (window.confirm('Tem certeza que deseja excluir TODOS os dados de produtividade? Esta ação não pode ser desfeita.')) {
-      setData([]);
-      alert('Todos os dados foram excluídos.');
+      setLoading(true);
+      try {
+        const dataCollectionRef = collection(db, 'productivityData');
+        const querySnapshot = await getDocs(dataCollectionRef);
+        const batch = writeBatch(db);
+        querySnapshot.forEach(doc => batch.delete(doc.ref));
+        await batch.commit();
+        alert('Todos os dados foram excluídos.');
+      } catch (error) {
+        console.error("Error deleting all data:", error);
+        alert("Ocorreu um erro ao excluir os dados. Verifique as regras de segurança do Firebase.");
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -128,7 +188,9 @@ const DataLoading: React.FC<DataLoadingProps> = ({ setView }) => {
             </tr>
           </thead>
           <tbody>
-            {data.length > 0 ? (
+            {loading ? (
+              <tr><td colSpan={7} className="text-center py-10">Carregando dados...</td></tr>
+            ) : data.length > 0 ? (
                 data.map((row) => (
                 <tr key={row.id} className="bg-white border-b hover:bg-gray-50">
                     <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">{row.mes}</td>

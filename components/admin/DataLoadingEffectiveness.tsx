@@ -1,6 +1,7 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
+import { collection, onSnapshot, getDocs, writeBatch, doc } from 'firebase/firestore';
+import { db } from '../../firebaseConfig';
 import { EffectivenessData, View } from '../../types';
-import useLocalStorage from '../../hooks/useLocalStorage';
 import Button from '../ui/Button';
 
 interface DataLoadingEffectivenessProps {
@@ -32,8 +33,29 @@ const DeleteIcon = () => (
 
 
 const DataLoadingEffectiveness: React.FC<DataLoadingEffectivenessProps> = ({ setView }) => {
-  const [data, setData] = useLocalStorage<EffectivenessData[]>('effectivenessData', []);
+  const [data, setData] = useState<EffectivenessData[]>([]);
+  const [loading, setLoading] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setLoading(true);
+    const dataCollectionRef = collection(db, 'effectivenessData');
+    const unsubscribe = onSnapshot(dataCollectionRef, (snapshot) => {
+      const dataList = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as EffectivenessData));
+      setData(dataList);
+      setLoading(false);
+    }, (error) => {
+      console.error("Firebase snapshot error:", error);
+      alert("Falha ao carregar os dados. Verifique a conexão e as regras de segurança do Firebase.");
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
 
   const handleImportClick = () => {
     fileInputRef.current?.click();
@@ -44,18 +66,45 @@ const DataLoadingEffectiveness: React.FC<DataLoadingEffectivenessProps> = ({ set
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       const text = e.target?.result as string;
       const lines = text.split('\n').filter(line => line.trim() !== '');
-      const importedData: EffectivenessData[] = lines.map((line, index) => {
-        const [mes, semana, area, zona, dvv, resultado, ab] = line.split('\t'); // Assuming tab-separated
-        return { id: `imported-${Date.now()}-${index}`, mes, semana, area, zona, dvv, resultado, ab };
+      if (lines.length === 0) {
+        alert("O arquivo está vazio ou em formato incorreto.");
+        return;
+      }
+      const importedData: Omit<EffectivenessData, 'id'>[] = lines.map((line) => {
+        const [mes, semana, area, zona, dvv, resultado, ab] = line.split('\t');
+        return { mes, semana, area, zona, dvv, resultado, ab };
       });
-      setData(importedData);
-      alert(`${importedData.length} registros importados com sucesso!`);
+      
+      if (window.confirm(`Você está prestes a substituir TODOS os dados de efetividade por ${importedData.length} novos registros. Deseja continuar?`)) {
+        try {
+          setLoading(true);
+          const dataCollectionRef = collection(db, 'effectivenessData');
+          const querySnapshot = await getDocs(dataCollectionRef);
+          const batch = writeBatch(db);
+          
+          querySnapshot.forEach(document => {
+              batch.delete(document.ref);
+          });
+
+          importedData.forEach(itemData => {
+              const newDocRef = doc(dataCollectionRef);
+              batch.set(newDocRef, itemData);
+          });
+          
+          await batch.commit();
+          alert(`${importedData.length} registros importados com sucesso!`);
+        } catch (error) {
+            console.error("Error importing data:", error);
+            alert("Ocorreu um erro ao importar os dados. Verifique as regras de segurança do Firebase.");
+        } finally {
+            setLoading(false);
+        }
+      }
     };
     reader.readAsText(file);
-    // Reset file input
     if (event.target) {
         event.target.value = '';
     }
@@ -79,10 +128,22 @@ const DataLoadingEffectiveness: React.FC<DataLoadingEffectivenessProps> = ({ set
     URL.revokeObjectURL(link.href);
   };
 
-  const handleDeleteAll = () => {
+  const handleDeleteAll = async () => {
     if (window.confirm('Tem certeza que deseja excluir TODOS os dados de efetividade? Esta ação não pode ser desfeita.')) {
-      setData([]);
-      alert('Todos os dados foram excluídos.');
+      setLoading(true);
+      try {
+        const dataCollectionRef = collection(db, 'effectivenessData');
+        const querySnapshot = await getDocs(dataCollectionRef);
+        const batch = writeBatch(db);
+        querySnapshot.forEach(doc => batch.delete(doc.ref));
+        await batch.commit();
+        alert('Todos os dados foram excluídos.');
+      } catch (error) {
+        console.error("Error deleting all data:", error);
+        alert("Ocorreu um erro ao excluir os dados. Verifique as regras de segurança do Firebase.");
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -128,7 +189,9 @@ const DataLoadingEffectiveness: React.FC<DataLoadingEffectivenessProps> = ({ set
             </tr>
           </thead>
           <tbody>
-            {data.length > 0 ? (
+          {loading ? (
+              <tr><td colSpan={7} className="text-center py-10">Carregando dados...</td></tr>
+            ) : data.length > 0 ? (
                 data.map((row) => (
                 <tr key={row.id} className="bg-white border-b hover:bg-gray-50">
                     <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">{row.mes}</td>
