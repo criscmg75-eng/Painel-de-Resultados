@@ -37,7 +37,8 @@ const PivotTable: React.FC<PivotTableProps> = ({ data, target, title }) => {
             // FIX: Explicitly type the accumulator (`acc`) in the reduce function to ensure
             // TypeScript correctly handles the object's shape and allows property assignments,
             // which resolves the indexing errors.
-            const dvvResults = dvvHeaders.reduce((acc: Record<string, { resultado: string; ab: string } | null>, dvv) => {
+            // Fix: Correctly typed the reduce accumulator using a generic type argument. This resolves the indexing errors.
+            const dvvResults = dvvHeaders.reduce<Record<string, { resultado: string; ab: string } | null>>((acc, dvv) => {
                 const item = data.find(d => d.zona === zona && d.dvv === dvv);
                 if (item) {
                     acc[dvv] = { resultado: item.resultado, ab: item.ab };

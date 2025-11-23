@@ -255,8 +255,17 @@ const UserManagement: React.FC<UserManagementProps> = ({ setView }) => {
                     <td className="px-6 py-4">{user.area}</td>
                     <td className="px-6 py-4">{user.telefone}</td>
                     <td className="px-6 py-4 flex space-x-2">
-                    <button onClick={() => handleOpenModal(user)} className="font-medium text-indigo-600 hover:underline">Editar</button>
-                    <button onClick={() => handleDelete(user.id)} className="font-medium text-red-600 hover:underline">Excluir</button>
+                    {user.zona.toUpperCase() === 'ADMIN' ? (
+                        <>
+                            <span className="font-medium text-gray-400 cursor-not-allowed">Editar</span>
+                            <span className="font-medium text-gray-400 cursor-not-allowed">Excluir</span>
+                        </>
+                    ) : (
+                        <>
+                            <button onClick={() => handleOpenModal(user)} className="font-medium text-indigo-600 hover:underline">Editar</button>
+                            <button onClick={() => handleDelete(user.id)} className="font-medium text-red-600 hover:underline">Excluir</button>
+                        </>
+                    )}
                     </td>
                 </tr>
                 ))
