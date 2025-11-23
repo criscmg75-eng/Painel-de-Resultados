@@ -1,52 +1,69 @@
 import React, { useState } from 'react';
+import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
+import { db } from '../../firebaseConfig';
 import { User, View } from '../../types';
 import Input from '../ui/Input';
 import Button from '../ui/Button';
 
 interface ChangePasswordScreenProps {
-  users: User[];
-  setUsers: (users: User[]) => void;
   setView: (view: View) => void;
 }
 
-const ChangePasswordScreen: React.FC<ChangePasswordScreenProps> = ({ users, setUsers, setView }) => {
+const ChangePasswordScreen: React.FC<ChangePasswordScreenProps> = ({ setView }) => {
   const [username, setUsername] = useState('');
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleChangePassword = (e: React.FormEvent) => {
+  const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setMessage('');
+    setLoading(true);
 
-    const userIndex = users.findIndex(
-      (u) => u.zona.toLowerCase() === username.toLowerCase()
-    );
+    try {
+        const usersRef = collection(db, 'users');
+        const querySnapshot = await getDocs(usersRef);
+        const allUsers: User[] = [];
+        querySnapshot.forEach((doc) => {
+            allUsers.push({ id: doc.id, ...doc.data() } as User);
+        });
 
-    if (userIndex === -1) {
-      setError('Usuário não encontrado.');
-      return;
-    }
+        const user = allUsers.find(
+            (u) => u.zona.toLowerCase() === username.toLowerCase()
+        );
 
-    const user = users[userIndex];
-    if (user.senha !== oldPassword && !(user.senha === '' && oldPassword === '')) {
-      setError('Senha antiga incorreta.');
-      return;
-    }
+        if (!user) {
+            setError('Usuário não encontrado.');
+            return;
+        }
 
-    const updatedUsers = [...users];
-    updatedUsers[userIndex] = { ...user, senha: newPassword };
-    setUsers(updatedUsers);
+        if (user.senha !== oldPassword && !(user.senha === '' && oldPassword === '')) {
+            setError('Senha antiga incorreta.');
+            return;
+        }
+
+        const userDocRef = doc(db, 'users', user.id);
+        await updateDoc(userDocRef, {
+            senha: newPassword
+        });
     
-    setMessage('Senha alterada com sucesso!');
-    setUsername('');
-    setOldPassword('');
-    setNewPassword('');
-    setTimeout(() => {
-        setView(View.LOGIN);
-    }, 2000);
+        setMessage('Senha alterada com sucesso!');
+        setUsername('');
+        setOldPassword('');
+        setNewPassword('');
+        setTimeout(() => {
+            setView(View.LOGIN);
+        }, 2000);
+
+    } catch (err) {
+        console.error("Firebase error:", err);
+        setError('Ocorreu um erro ao alterar a senha.');
+    } finally {
+        setLoading(false);
+    }
   };
 
   return (
@@ -78,8 +95,8 @@ const ChangePasswordScreen: React.FC<ChangePasswordScreenProps> = ({ users, setU
         />
         {error && <p className="text-red-500 text-sm text-center">{error}</p>}
         {message && <p className="text-green-500 text-sm text-center">{message}</p>}
-        <Button type="submit">
-            Confirmar Alteração
+        <Button type="submit" disabled={loading}>
+            {loading ? 'Alterando...' : 'Confirmar Alteração'}
         </Button>
       </form>
       <div className="text-center">

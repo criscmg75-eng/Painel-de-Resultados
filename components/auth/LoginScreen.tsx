@@ -1,29 +1,48 @@
 import React, { useState } from 'react';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '../../firebaseConfig';
 import { User, View } from '../../types';
 import Input from '../ui/Input';
 import Button from '../ui/Button';
 
 interface LoginScreenProps {
-  users: User[];
   setView: (view: View) => void;
   onLogin: (user: User) => void;
 }
 
-const LoginScreen: React.FC<LoginScreenProps> = ({ users, setView, onLogin }) => {
+const LoginScreen: React.FC<LoginScreenProps> = ({ setView, onLogin }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    const user = users.find(
-      (u) => u.zona.toLowerCase() === username.toLowerCase()
-    );
+    setLoading(true);
+    setError('');
 
-    if (user && (user.senha === password || (user.senha === '' && password === ''))) {
-      onLogin(user);
-    } else {
-      setError('Usuário ou senha inválidos.');
+    try {
+      const usersRef = collection(db, 'users');
+      const querySnapshot = await getDocs(usersRef);
+      const allUsers: User[] = [];
+      querySnapshot.forEach((doc) => {
+        allUsers.push({ id: doc.id, ...doc.data() } as User);
+      });
+
+      const user = allUsers.find(
+        (u) => u.zona.toLowerCase() === username.toLowerCase()
+      );
+
+      if (user && (user.senha === password || (user.senha === '' && password === ''))) {
+        onLogin(user);
+      } else {
+        setError('Usuário ou senha inválidos.');
+      }
+    } catch (err) {
+      console.error("Firebase connection error:", err);
+      setError('Falha ao conectar com o banco de dados.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -48,8 +67,8 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ users, setView, onLogin }) =>
           onChange={(e) => setPassword(e.target.value)}
         />
         {error && <p className="text-red-500 text-sm text-center">{error}</p>}
-        <Button type="submit">
-            Entrar
+        <Button type="submit" disabled={loading}>
+            {loading ? 'Conectando...' : 'Entrar'}
         </Button>
       </form>
       <div className="text-center">

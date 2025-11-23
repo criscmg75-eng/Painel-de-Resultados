@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, getDocs, writeBatch } from 'firebase/firestore';
+import { db } from '../../firebaseConfig';
 import { User, View } from '../../types';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
 import Modal from '../ui/Modal';
 
 interface UserManagementProps {
-  users: User[];
-  setUsers: (users: User[]) => void;
   setView: (view: View) => void;
 }
 
@@ -26,7 +26,9 @@ const ExportIcon = () => (
   </svg>
 );
 
-const UserManagement: React.FC<UserManagementProps> = ({ users, setUsers, setView }) => {
+const UserManagement: React.FC<UserManagementProps> = ({ setView }) => {
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [formData, setFormData] = useState<Omit<User, 'id'>>({
@@ -36,6 +38,25 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, setUsers, setVie
     senha: '',
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setLoading(true);
+    const usersCollectionRef = collection(db, 'users');
+    const unsubscribe = onSnapshot(usersCollectionRef, (snapshot) => {
+      const usersList = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as User));
+      setUsers(usersList);
+      setLoading(false);
+    }, (error) => {
+        console.error("Firebase snapshot error:", error);
+        alert("Falha ao carregar os usuários. Verifique a conexão e as regras de segurança do Firebase.");
+        setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     if (currentUser) {
@@ -71,27 +92,37 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, setUsers, setVie
     setCurrentUser(null);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (currentUser) {
-      // Edit user
-      setUsers(users.map(u => u.id === currentUser.id ? { ...formData, id: u.id } : u));
-    } else {
-      // Add user
-      const newUser = { ...formData, id: `user-${Date.now()}` };
-      setUsers([...users, newUser]);
+    try {
+      if (currentUser) {
+        // Edit user
+        const userDocRef = doc(db, 'users', currentUser.id);
+        await updateDoc(userDocRef, formData);
+      } else {
+        // Add user
+        await addDoc(collection(db, 'users'), formData);
+      }
+      handleCloseModal();
+    } catch (error) {
+      console.error("Error saving user:", error);
+      alert("Ocorreu um erro ao salvar o usuário. Verifique as regras de segurança do Firebase.");
     }
-    handleCloseModal();
   };
 
-  const handleDelete = (userId: string) => {
+  const handleDelete = async (userId: string) => {
     const userToDelete = users.find(u => u.id === userId);
     if (userToDelete?.zona.toUpperCase() === 'ADMIN') {
         alert('Não é possível excluir o usuário Administrador.');
         return;
     }
     if (window.confirm('Tem certeza que deseja excluir este usuário?')) {
-        setUsers(prevUsers => prevUsers.filter(user => user.id !== userId));
+      try {
+        await deleteDoc(doc(db, 'users', userId));
+      } catch (error) {
+        console.error("Error deleting user:", error);
+        alert("Ocorreu um erro ao excluir o usuário. Verifique as regras de segurança do Firebase.");
+      }
     }
   };
 
@@ -104,7 +135,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, setUsers, setVie
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       const text = e.target?.result as string;
       const lines = text.split('\n').filter(line => line.trim() !== '');
       
@@ -115,10 +146,9 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, setUsers, setVie
       
       const dataLines = lines[0].toUpperCase().startsWith('ZONA') ? lines.slice(1) : lines;
 
-      const importedUsers: User[] = dataLines.map((line, index) => {
+      const importedUsers: Omit<User, 'id'>[] = dataLines.map((line) => {
         const [zona, telefone, senha] = line.split('\t').map(s => s.trim());
         return { 
-          id: `imported-${Date.now()}-${index}`,
           zona: zona || '',
           area: (zona || '').slice(0, 8),
           telefone: telefone || '',
@@ -127,10 +157,31 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, setUsers, setVie
       }).filter(u => u.zona);
 
       if (window.confirm(`Você está prestes a substituir todos os usuários (exceto o ADMIN) por ${importedUsers.length} novos registros. Deseja continuar?`)) {
-          const adminUser = users.find(u => u.zona.toUpperCase() === 'ADMIN');
-          const finalUsers = adminUser ? [adminUser, ...importedUsers] : importedUsers;
-          setUsers(finalUsers);
-          alert(`${importedUsers.length} usuários importados com sucesso!`);
+          try {
+            setLoading(true);
+            const usersRef = collection(db, 'users');
+            const querySnapshot = await getDocs(usersRef);
+            const batch = writeBatch(db);
+            
+            querySnapshot.forEach(document => {
+                if (document.data().zona.toUpperCase() !== 'ADMIN') {
+                    batch.delete(document.ref);
+                }
+            });
+
+            importedUsers.forEach(userData => {
+                const newDocRef = doc(usersRef);
+                batch.set(newDocRef, userData);
+            });
+            
+            await batch.commit();
+            alert(`${importedUsers.length} usuários importados com sucesso!`);
+        } catch (error) {
+            console.error("Error importing users:", error);
+            alert("Ocorreu um erro ao importar os usuários. Verifique as regras de segurança do Firebase.");
+        } finally {
+            setLoading(false);
+        }
       }
     };
     reader.readAsText(file);
@@ -193,17 +244,23 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, setUsers, setVie
             </tr>
           </thead>
           <tbody>
-            {users.map((user) => (
-              <tr key={user.id} className="bg-white border-b">
-                  <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">{user.zona}</td>
-                  <td className="px-6 py-4">{user.area}</td>
-                  <td className="px-6 py-4">{user.telefone}</td>
-                  <td className="px-6 py-4 flex space-x-2">
-                  <button onClick={() => handleOpenModal(user)} className="font-medium text-indigo-600 hover:underline">Editar</button>
-                  <button onClick={() => handleDelete(user.id)} className="font-medium text-red-600 hover:underline">Excluir</button>
-                  </td>
-              </tr>
-            ))}
+            {loading ? (
+                <tr><td colSpan={4} className="text-center py-10">Carregando usuários...</td></tr>
+            ) : users.length === 0 ? (
+                <tr><td colSpan={4} className="text-center py-10">Nenhum usuário encontrado.</td></tr>
+            ) : (
+                users.map((user) => (
+                <tr key={user.id} className="bg-white border-b">
+                    <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">{user.zona}</td>
+                    <td className="px-6 py-4">{user.area}</td>
+                    <td className="px-6 py-4">{user.telefone}</td>
+                    <td className="px-6 py-4 flex space-x-2">
+                    <button onClick={() => handleOpenModal(user)} className="font-medium text-indigo-600 hover:underline">Editar</button>
+                    <button onClick={() => handleDelete(user.id)} className="font-medium text-red-600 hover:underline">Excluir</button>
+                    </td>
+                </tr>
+                ))
+            )}
           </tbody>
         </table>
       </div>

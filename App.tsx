@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { User, View } from './types';
 import LoginScreen from './components/auth/LoginScreen';
 import ChangePasswordScreen from './components/auth/ChangePasswordScreen';
@@ -10,29 +10,10 @@ import DataLoadingSelection from './components/admin/DataLoadingSelection';
 import DataLoadingEffectiveness from './components/admin/DataLoadingEffectiveness';
 import Cockpit from './components/cockpit/Cockpit';
 import PEResultsScreen from './components/results/PEResultsScreen';
-import useLocalStorage from './hooks/useLocalStorage';
 
 const App: React.FC = () => {
-  const [users, setUsers] = useLocalStorage<User[]>('users', []);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [currentView, setCurrentView] = useState<View>(View.LOGIN);
-
-  useEffect(() => {
-    // Initialize admin user if it doesn't exist
-    const adminUserExists = users.some(
-      (user) => user.zona.toUpperCase() === 'ADMIN'
-    );
-    if (!adminUserExists) {
-      const adminUser: User = {
-        id: `admin-${Date.now()}`,
-        zona: 'ADMIN',
-        area: 'ADMIN',
-        telefone: '',
-        senha: '1234',
-      };
-      setUsers([adminUser]);
-    }
-  }, [users, setUsers]);
 
   const handleLogin = (user: User) => {
     setCurrentUser(user);
@@ -51,13 +32,13 @@ const App: React.FC = () => {
   const renderContent = () => {
     switch (currentView) {
       case View.LOGIN:
-        return <LoginScreen users={users} setView={setCurrentView} onLogin={handleLogin} />;
+        return <LoginScreen setView={setCurrentView} onLogin={handleLogin} />;
       case View.CHANGE_PASSWORD:
-        return <ChangePasswordScreen users={users} setUsers={setUsers} setView={setCurrentView} />;
+        return <ChangePasswordScreen setView={setCurrentView} />;
       case View.ADMIN_DASHBOARD:
         return <AdminDashboard setView={setCurrentView} onLogout={handleLogout} />;
       case View.USER_MANAGEMENT:
-        return <UserManagement users={users} setUsers={setUsers} setView={setCurrentView} />;
+        return <UserManagement setView={setCurrentView} />;
       case View.SYSTEM_PARAMETERS:
         return <SystemParameters setView={setCurrentView} />;
       case View.DATA_LOADING_SELECTION:
@@ -71,7 +52,7 @@ const App: React.FC = () => {
       case View.PE_RESULTS:
         return <PEResultsScreen user={currentUser!} setView={setCurrentView} />;
       default:
-        return <LoginScreen users={users} setView={setCurrentView} onLogin={handleLogin} />;
+        return <LoginScreen setView={setCurrentView} onLogin={handleLogin} />;
     }
   };
 
