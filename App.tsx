@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, View } from './types';
 import LoginScreen from './components/auth/LoginScreen';
 import ChangePasswordScreen from './components/auth/ChangePasswordScreen';
@@ -10,10 +10,40 @@ import DataLoadingSelection from './components/admin/DataLoadingSelection';
 import DataLoadingEffectiveness from './components/admin/DataLoadingEffectiveness';
 import Cockpit from './components/cockpit/Cockpit';
 import PEResultsScreen from './components/results/PEResultsScreen';
+import RankingPEScreen from './components/results/RankingPEScreen';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { db } from './firebase';
+import PESelectionScreen from './components/cockpit/PESelectionScreen';
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [currentView, setCurrentView] = useState<View>(View.LOGIN);
+
+  useEffect(() => {
+    // Initialize ADMIN user if it doesn't exist in Firestore
+    const checkAdmin = async () => {
+      const adminDocRef = doc(db, "users", "ADMIN_USER_ID");
+      const adminDocSnap = await getDoc(adminDocRef);
+
+      if (!adminDocSnap.exists()) {
+        const adminUser: Omit<User, 'id'> = {
+          zona: 'ADMIN',
+          area: 'ADMIN',
+          telefone: '',
+          senha: '1234',
+          tipoacesso: 'ADMIN',
+        };
+        await setDoc(adminDocRef, adminUser);
+      } else {
+        const adminData = adminDocSnap.data();
+        if (!adminData.tipoacesso) {
+          await setDoc(adminDocRef, { tipoacesso: 'ADMIN' }, { merge: true });
+        }
+      }
+    };
+    checkAdmin();
+  }, []);
+
 
   const handleLogin = (user: User) => {
     setCurrentUser(user);
@@ -49,8 +79,12 @@ const App: React.FC = () => {
         return <DataLoadingEffectiveness setView={setCurrentView} />;
       case View.COCKPIT:
         return <Cockpit user={currentUser!} onLogout={handleLogout} setView={setCurrentView} />;
+      case View.PE_SELECTION:
+        return <PESelectionScreen setView={setCurrentView} />;
       case View.PE_RESULTS:
         return <PEResultsScreen user={currentUser!} setView={setCurrentView} />;
+      case View.RANKING_PE:
+        return <RankingPEScreen user={currentUser!} setView={setCurrentView} />;
       default:
         return <LoginScreen setView={setCurrentView} onLogin={handleLogin} />;
     }

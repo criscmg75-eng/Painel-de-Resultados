@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { collection, getDocs } from 'firebase/firestore';
-import { db } from '../../firebaseConfig';
 import { User, View } from '../../types';
 import Input from '../ui/Input';
 import Button from '../ui/Button';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '../../firebase';
 
 interface LoginScreenProps {
   setView: (view: View) => void;
@@ -18,31 +18,34 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ setView, onLogin }) => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError('');
+    setLoading(true);
 
     try {
       const usersRef = collection(db, 'users');
-      const querySnapshot = await getDocs(usersRef);
-      const allUsers: User[] = [];
-      querySnapshot.forEach((doc) => {
-        allUsers.push({ id: doc.id, ...doc.data() } as User);
-      });
+      // Firebase queries are case-sensitive. Storing usernames in a consistent case is recommended.
+      const q = query(usersRef, where('zona', '==', username));
+      const querySnapshot = await getDocs(q);
 
-      const user = allUsers.find(
-        (u) => u.zona.toLowerCase() === username.toLowerCase()
-      );
+      if (querySnapshot.empty) {
+        setError('Usuário ou senha inválidos.');
+        setLoading(false);
+        return;
+      }
+      
+      const userDoc = querySnapshot.docs[0];
+      const user = { id: userDoc.id, ...userDoc.data() } as User;
 
-      if (user && (user.senha === password || (user.senha === '' && password === ''))) {
+      if (user.senha === password) {
         onLogin(user);
       } else {
         setError('Usuário ou senha inválidos.');
       }
     } catch (err) {
-      console.error("Firebase connection error:", err);
-      setError('Falha ao conectar com o banco de dados.');
+      console.error("Error logging in:", err);
+      setError("Ocorreu um erro ao tentar fazer login.");
     } finally {
-      setLoading(false);
+        setLoading(false);
     }
   };
 
@@ -59,22 +62,25 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ setView, onLogin }) => {
           value={username}
           onChange={(e) => setUsername(e.target.value)}
           required
+          disabled={loading}
         />
         <Input
           label="Senha"
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          disabled={loading}
         />
         {error && <p className="text-red-500 text-sm text-center">{error}</p>}
         <Button type="submit" disabled={loading}>
-            {loading ? 'Conectando...' : 'Entrar'}
+          {loading ? 'Entrando...' : 'Entrar'}
         </Button>
       </form>
       <div className="text-center">
         <button
           onClick={() => setView(View.CHANGE_PASSWORD)}
           className="text-sm text-indigo-600 hover:underline"
+          disabled={loading}
         >
           Alterar senha
         </button>

@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
-import { db } from '../../firebaseConfig';
 import { User, View, ProductivityData, EffectivenessData, SystemParameters } from '../../types';
+import { db } from '../../firebase';
+import { collection, doc, getDoc, getDocs } from 'firebase/firestore';
 
 interface PEResultsScreenProps {
   user: User;
@@ -22,14 +22,11 @@ const PivotTable: React.FC<PivotTableProps> = ({ data, target, title }) => {
             return { headers: [], rows: [] };
         }
 
-        // Fix: Explicitly type dvvHeaders and zonas as string arrays.
-        // This resolves an issue where TypeScript infers them as 'unknown[]' from the Set,
-        // causing an error when their elements are used as index keys.
-        const dvvHeaders: string[] = [...new Set(data.map(item => item.dvv))].sort((a,b) => Number(a) - Number(b));
-        const zonas: string[] = [...new Set(data.map(item => item.zona))].sort();
+        const dvvHeaders = [...new Set(data.map(item => item.dvv))].sort();
+        const zonas = [...new Set(data.map(item => item.zona))].sort();
 
         const rows = zonas.map(zona => {
-            const dvvResults = dvvHeaders.reduce<Record<string, { resultado: string; ab: string } | null>>((acc, dvv) => {
+            const dvvResults = dvvHeaders.reduce((acc, dvv) => {
                 const item = data.find(d => d.zona === zona && d.dvv === dvv);
                 if (item) {
                     acc[dvv] = { resultado: item.resultado, ab: item.ab };
@@ -37,7 +34,7 @@ const PivotTable: React.FC<PivotTableProps> = ({ data, target, title }) => {
                     acc[dvv] = null;
                 }
                 return acc;
-            }, {});
+            }, {} as Record<string, { resultado: string; ab: string } | null>);
             
             return {
                 zona,
@@ -49,7 +46,7 @@ const PivotTable: React.FC<PivotTableProps> = ({ data, target, title }) => {
     }, [data]);
 
     const getResultClass = (resultStr: string, currentTarget: number) => {
-        const resultNum = parseFloat(resultStr.replace(',', '.'));
+        const resultNum = parseFloat(resultStr);
         if (isNaN(resultNum)) {
             return 'text-gray-900';
         }
@@ -124,34 +121,50 @@ const PEResultsScreen: React.FC<PEResultsScreenProps> = ({ user, setView }) => {
     efetividade: 95, 
     mesAtual: '1', 
     semanaAtual: '1',
-    ultimaAtualizacao: ''
+    ultimaAtualizacao: '',
+    ponderacaoProdutividade: 40,
+    ponderacaoEfetividade: 60,
   });
   const [loading, setLoading] = useState(true);
-  
+
+  const [selectedMonth, setSelectedMonth] = useState('all');
+  const [selectedWeek, setSelectedWeek] = useState('all');
+
   useEffect(() => {
     const fetchData = async () => {
         setLoading(true);
         try {
-            // Fetch System Parameters
-            const paramsDocRef = doc(db, 'systemParams', 'config');
-            const paramsDocSnap = await getDoc(paramsDocRef);
-            if (paramsDocSnap.exists()) {
-                setSystemParams(paramsDocSnap.data() as SystemParameters);
+            const paramsRef = doc(db, 'system', 'parameters');
+            const prodRef = collection(db, 'productivityData');
+            const effRef = collection(db, 'effectivenessData');
+
+            const [paramsSnap, prodSnap, effSnap] = await Promise.all([
+                getDoc(paramsRef),
+                getDocs(prodRef),
+                getDocs(effRef)
+            ]);
+            
+            let fetchedParams = systemParams;
+            if (paramsSnap.exists()) {
+                fetchedParams = { ...systemParams, ...paramsSnap.data() } as SystemParameters;
+                setSystemParams(fetchedParams);
             }
 
-            // Fetch Productivity Data
-            const prodSnapshot = await getDocs(collection(db, 'productivityData'));
-            const prodData = prodSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ProductivityData));
+            const prodData = prodSnap.docs.map(d => ({ id: d.id, ...d.data() })) as ProductivityData[];
             setProductivityData(prodData);
-
-            // Fetch Effectiveness Data
-            const effSnapshot = await getDocs(collection(db, 'effectivenessData'));
-            const effData = effSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EffectivenessData));
+            
+            const effData = effSnap.docs.map(d => ({ id: d.id, ...d.data() })) as EffectivenessData[];
             setEffectivenessData(effData);
+            
+            // Set initial filters after data is fetched
+            const allMonths = ['all', ...new Set([...prodData, ...effData].map(d => d.mes).filter(Boolean))];
+            const allWeeks = ['all', ...new Set([...prodData, ...effData].map(d => d.semana).filter(Boolean))];
+            
+            setSelectedMonth(allMonths.includes(fetchedParams.mesAtual) ? fetchedParams.mesAtual : 'all');
+            setSelectedWeek(allWeeks.includes(fetchedParams.semanaAtual) ? fetchedParams.semanaAtual : 'all');
 
-        } catch (error) {
-            console.error("Error fetching data from Firebase:", error);
-            alert("Ocorreu um erro ao buscar os dados do servidor.");
+        } catch (err) {
+            console.error("Error fetching results data:", err);
         } finally {
             setLoading(false);
         }
@@ -163,22 +176,8 @@ const PEResultsScreen: React.FC<PEResultsScreenProps> = ({ user, setView }) => {
   const userEffData = useMemo(() => effectivenessData.filter(d => d.area === user.area), [effectivenessData, user.area]);
   
   const allData = useMemo(() => [...userProdData, ...userEffData], [userProdData, userEffData]);
-  const months = useMemo(() => ['all', ...Array.from(new Set(allData.map(d => d.mes).filter(Boolean))).sort((a,b) => Number(a) - Number(b))], [allData]);
-  const weeks = useMemo(() => ['all', ...Array.from(new Set(allData.map(d => d.semana).filter(Boolean))).sort((a,b) => Number(a) - Number(b))], [allData]);
-  
-  const initialMonth = months.includes(systemParams.mesAtual) ? systemParams.mesAtual : 'all';
-  const initialWeek = weeks.includes(systemParams.semanaAtual) ? systemParams.semanaAtual : 'all';
-
-  const [selectedMonth, setSelectedMonth] = useState('all');
-  const [selectedWeek, setSelectedWeek] = useState('all');
-
-  // Set initial filter values once data is loaded
-  useEffect(() => {
-      if(!loading){
-        setSelectedMonth(initialMonth);
-        setSelectedWeek(initialWeek);
-      }
-  }, [loading, initialMonth, initialWeek]);
+  const months = useMemo(() => ['all', ...Array.from(new Set(allData.map(d => d.mes).filter(Boolean)))], [allData]);
+  const weeks = useMemo(() => ['all', ...Array.from(new Set(allData.map(d => d.semana).filter(Boolean)))], [allData]);
 
   const filteredProdData = useMemo(() => {
     return userProdData.filter(d => 
@@ -213,7 +212,7 @@ const PEResultsScreen: React.FC<PEResultsScreenProps> = ({ user, setView }) => {
   if (loading) {
       return (
           <div className="w-full max-w-6xl bg-white p-8 rounded-xl shadow-lg text-center">
-              <h1 className="text-xl font-semibold">Carregando dados...</h1>
+              Carregando resultados...
           </div>
       );
   }

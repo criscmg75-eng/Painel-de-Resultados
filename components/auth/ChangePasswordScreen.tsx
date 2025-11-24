@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
-import { db } from '../../firebaseConfig';
 import { User, View } from '../../types';
 import Input from '../ui/Input';
 import Button from '../ui/Button';
+import { collection, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
+import { db } from '../../firebase';
+
 
 interface ChangePasswordScreenProps {
   setView: (view: View) => void;
@@ -24,43 +25,41 @@ const ChangePasswordScreen: React.FC<ChangePasswordScreenProps> = ({ setView }) 
     setLoading(true);
 
     try {
-        const usersRef = collection(db, 'users');
-        const querySnapshot = await getDocs(usersRef);
-        const allUsers: User[] = [];
-        querySnapshot.forEach((doc) => {
-            allUsers.push({ id: doc.id, ...doc.data() } as User);
-        });
+      const usersRef = collection(db, 'users');
+      const q = query(usersRef, where('zona', '==', username));
+      const querySnapshot = await getDocs(q);
 
-        const user = allUsers.find(
-            (u) => u.zona.toLowerCase() === username.toLowerCase()
-        );
+      if (querySnapshot.empty) {
+        setError('Usuário não encontrado.');
+        setLoading(false);
+        return;
+      }
+      
+      const userDoc = querySnapshot.docs[0];
+      const user = { id: userDoc.id, ...userDoc.data() } as User;
 
-        if (!user) {
-            setError('Usuário não encontrado.');
-            return;
-        }
+      if (user.senha !== oldPassword) {
+        setError('Senha antiga incorreta.');
+        setLoading(false);
+        return;
+      }
+      
+      const userDocRef = doc(db, 'users', user.id);
+      await updateDoc(userDocRef, {
+        senha: newPassword
+      });
 
-        if (user.senha !== oldPassword && !(user.senha === '' && oldPassword === '')) {
-            setError('Senha antiga incorreta.');
-            return;
-        }
-
-        const userDocRef = doc(db, 'users', user.id);
-        await updateDoc(userDocRef, {
-            senha: newPassword
-        });
-    
-        setMessage('Senha alterada com sucesso!');
-        setUsername('');
-        setOldPassword('');
-        setNewPassword('');
-        setTimeout(() => {
-            setView(View.LOGIN);
-        }, 2000);
+      setMessage('Senha alterada com sucesso!');
+      setUsername('');
+      setOldPassword('');
+      setNewPassword('');
+      setTimeout(() => {
+          setView(View.LOGIN);
+      }, 2000);
 
     } catch (err) {
-        console.error("Firebase error:", err);
-        setError('Ocorreu um erro ao alterar a senha.');
+      console.error("Error changing password:", err);
+      setError("Ocorreu um erro ao alterar a senha.");
     } finally {
         setLoading(false);
     }
@@ -79,12 +78,14 @@ const ChangePasswordScreen: React.FC<ChangePasswordScreenProps> = ({ setView }) 
           value={username}
           onChange={(e) => setUsername(e.target.value)}
           required
+          disabled={loading}
         />
         <Input
           label="Senha Antiga"
           type="password"
           value={oldPassword}
           onChange={(e) => setOldPassword(e.target.value)}
+          disabled={loading}
         />
         <Input
           label="Nova Senha"
@@ -92,17 +93,19 @@ const ChangePasswordScreen: React.FC<ChangePasswordScreenProps> = ({ setView }) 
           value={newPassword}
           onChange={(e) => setNewPassword(e.target.value)}
           required
+          disabled={loading}
         />
         {error && <p className="text-red-500 text-sm text-center">{error}</p>}
         {message && <p className="text-green-500 text-sm text-center">{message}</p>}
         <Button type="submit" disabled={loading}>
-            {loading ? 'Alterando...' : 'Confirmar Alteração'}
+          {loading ? 'Alterando...' : 'Confirmar Alteração'}
         </Button>
       </form>
       <div className="text-center">
         <button
           onClick={() => setView(View.LOGIN)}
           className="text-sm text-indigo-600 hover:underline"
+          disabled={loading}
         >
           Voltar para o Login
         </button>

@@ -9,7 +9,7 @@ interface CockpitProps {
 
 const Cockpit: React.FC<CockpitProps> = ({ user, onLogout, setView }) => {
   const indicators = [
-    { name: 'P&E', view: View.PE_RESULTS, enabled: true },
+    { name: 'P&E', view: View.PE_SELECTION, enabled: true },
     { name: 'Parceria', enabled: false },
     { name: 'Inadimplência', enabled: false },
     { name: 'ULP', enabled: false },

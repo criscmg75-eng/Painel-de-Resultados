@@ -4,6 +4,7 @@ export interface User {
   area: string;
   telefone: string;
   senha: string;
+  tipoacesso: string;
 }
 
 export interface SystemParameters {
@@ -12,6 +13,8 @@ export interface SystemParameters {
   mesAtual: string;
   semanaAtual: string;
   ultimaAtualizacao: string;
+  ponderacaoProdutividade: number;
+  ponderacaoEfetividade: number;
 }
 
 export interface ProductivityData {
@@ -46,5 +49,7 @@ export enum View {
   DATA_LOADING = 'DATA_LOADING',
   DATA_LOADING_EFFECTIVENESS = 'DATA_LOADING_EFFECTIVENESS',
   COCKPIT = 'COCKPIT',
+  PE_SELECTION = 'PE_SELECTION',
   PE_RESULTS = 'PE_RESULTS',
+  RANKING_PE = 'RANKING_PE',
 }
