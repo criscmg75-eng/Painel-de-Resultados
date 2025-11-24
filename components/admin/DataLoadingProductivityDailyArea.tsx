@@ -64,7 +64,7 @@ const DataLoadingProductivityDailyArea: React.FC<DataLoadingProductivityDailyAre
       const text = e.target?.result as string;
       const lines = text.split('\n').filter(line => line.trim() !== '');
       const importedData: Omit<ProductTotalTvDiaData, 'id'>[] = lines.map(line => {
-        const [mes, semana, area, dvv, resultado, ab] = line.split('\t');
+        const [mes, semana, dvv, area, resultado, ab] = line.split('\t');
         return { mes, semana, area, dvv, resultado, ab };
       });
 
@@ -104,9 +104,9 @@ const DataLoadingProductivityDailyArea: React.FC<DataLoadingProductivityDailyAre
         alert("Não há dados para exportar.");
         return;
     }
-    const header = "MÊS\tSEMANA\tÁREA\tDVV\tRESULTADO\t(A/B)\n";
+    const header = "MÊS\tSEMANA\tDVV\tÁREA\tRESULTADO\t(A/B)\n";
     const fileContent = data.reduce((acc, row) => {
-        return acc + `${row.mes}\t${row.semana}\t${row.area}\t${row.dvv}\t${row.resultado}\t${row.ab}\n`;
+        return acc + `${row.mes}\t${row.semana}\t${row.dvv}\t${row.area}\t${row.resultado}\t${row.ab}\n`;
     }, header);
 
     const blob = new Blob([fileContent], { type: 'text/plain;charset=utf-8' });
@@ -171,8 +171,8 @@ const DataLoadingProductivityDailyArea: React.FC<DataLoadingProductivityDailyAre
             <tr>
               <th scope="col" className="px-6 py-3">Mês</th>
               <th scope="col" className="px-6 py-3">Semana</th>
-              <th scope="col" className="px-6 py-3">Área</th>
               <th scope="col" className="px-6 py-3">DVV</th>
+              <th scope="col" className="px-6 py-3">Área</th>
               <th scope="col" className="px-6 py-3">Resultado</th>
               <th scope="col" className="px-6 py-3">(A/B)</th>
             </tr>
@@ -183,8 +183,8 @@ const DataLoadingProductivityDailyArea: React.FC<DataLoadingProductivityDailyAre
                 <tr key={row.id} className="bg-white border-b hover:bg-gray-50">
                     <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">{row.mes}</td>
                     <td className="px-6 py-4">{row.semana}</td>
-                    <td className="px-6 py-4">{row.area}</td>
                     <td className="px-6 py-4">{row.dvv}</td>
+                    <td className="px-6 py-4">{row.area}</td>
                     <td className="px-6 py-4">{row.resultado}</td>
                     <td className="px-6 py-4">{row.ab}</td>
                 </tr>
