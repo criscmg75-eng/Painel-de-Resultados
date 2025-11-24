@@ -30,13 +30,13 @@ const DataLoadingSelection: React.FC<DataLoadingSelectionProps> = ({ setView }) 
           icon={<ChartBarIcon />}
           title="Produtividade"
           description="Carregar dados para o indicador de produtividade."
-          onClick={() => setView(View.DATA_LOADING)}
+          onClick={() => setView(View.DATA_LOADING_PRODUCTIVITY_SELECTION)}
         />
         <Card
           icon={<ChartBarIcon />}
           title="Efetividade"
           description="Carregar dados para o indicador de efetividade."
-          onClick={() => setView(View.DATA_LOADING_EFFECTIVENESS)}
+          onClick={() => setView(View.DATA_LOADING_EFFECTIVENESS_SELECTION)}
         />
       </div>
     </div>

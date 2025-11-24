@@ -1,11 +1,11 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { ProductivityData, View } from '../../types';
+import { ProductTotalZvSemData, View } from '../../types';
 import Button from '../ui/Button';
 import { db } from '../../firebase';
 import { collection, getDocs, doc, writeBatch } from 'firebase/firestore';
 
 
-interface DataLoadingProps {
+interface DataLoadingProductivityWeeklyProps {
   setView: (view: View) => void;
 }
 
@@ -33,16 +33,16 @@ const DeleteIcon = () => (
 );
 
 
-const DataLoading: React.FC<DataLoadingProps> = ({ setView }) => {
-  const [data, setData] = useState<ProductivityData[]>([]);
+const DataLoadingProductivityWeekly: React.FC<DataLoadingProductivityWeeklyProps> = ({ setView }) => {
+  const [data, setData] = useState<ProductTotalZvSemData[]>([]);
   const [loading, setLoading] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const dataCollectionRef = collection(db, 'productivityData');
+  const dataCollectionRef = collection(db, 'productTotalZvSem');
 
   const fetchData = async () => {
     setLoading(true);
     const snapshot = await getDocs(dataCollectionRef);
-    const fetchedData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as ProductivityData[];
+    const fetchedData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as ProductTotalZvSemData[];
     setData(fetchedData);
     setLoading(false);
   };
@@ -63,31 +63,29 @@ const DataLoading: React.FC<DataLoadingProps> = ({ setView }) => {
     reader.onload = async (e) => {
       const text = e.target?.result as string;
       const lines = text.split('\n').filter(line => line.trim() !== '');
-      const importedData: Omit<ProductivityData, 'id'>[] = lines.map(line => {
-        const [mes, semana, area, zona, dvv, resultado, ab] = line.split('\t');
-        return { mes, semana, area, zona, dvv, resultado, ab };
+      const importedData: Omit<ProductTotalZvSemData, 'id'>[] = lines.map(line => {
+        const [mes, semana, area, zona, resultado, ab] = line.split('\t');
+        return { mes, semana, area, zona, resultado, ab };
       });
 
       if (window.confirm(`Isso substituirá todos os ${data.length} registros existentes por ${importedData.length} novos registros. Deseja continuar?`)) {
         setLoading(true);
         try {
-          // 1. Delete all existing documents in a batch
           const deleteBatch = writeBatch(db);
           data.forEach(item => {
-            deleteBatch.delete(doc(db, 'productivityData', item.id));
+            deleteBatch.delete(doc(db, 'productTotalZvSem', item.id));
           });
           await deleteBatch.commit();
           
-          // 2. Add new documents in another batch
           const addBatch = writeBatch(db);
           importedData.forEach(item => {
-            const docRef = doc(collection(db, 'productivityData')); // Auto-generate ID
+            const docRef = doc(collection(db, 'productTotalZvSem'));
             addBatch.set(docRef, item);
           });
           await addBatch.commit();
           
           alert(`${importedData.length} registros importados com sucesso!`);
-          fetchData(); // Refetch to update the UI
+          fetchData();
         } catch (err) {
             console.error(err);
             alert("Ocorreu um erro ao importar os dados.");
@@ -106,26 +104,26 @@ const DataLoading: React.FC<DataLoadingProps> = ({ setView }) => {
         alert("Não há dados para exportar.");
         return;
     }
-    const header = "MÊS\tSEMANA\tÁREA\tZONA\tDVV\tRESULTADO\t(A/B)\n";
+    const header = "MÊS\tSEMANA\tÁREA\tZONA\tRESULTADO\t(A/B)\n";
     const fileContent = data.reduce((acc, row) => {
-        return acc + `${row.mes}\t${row.semana}\t${row.area}\t${row.zona}\t${row.dvv}\t${row.resultado}\t${row.ab}\n`;
+        return acc + `${row.mes}\t${row.semana}\t${row.area}\t${row.zona}\t${row.resultado}\t${row.ab}\n`;
     }, header);
 
     const blob = new Blob([fileContent], { type: 'text/plain;charset=utf-8' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = 'produtividade_export.txt';
+    link.download = 'produtividade_semanal_export.txt';
     link.click();
     URL.revokeObjectURL(link.href);
   };
 
   const handleDeleteAll = async () => {
-    if (window.confirm('Tem certeza que deseja excluir TODOS os dados de produtividade? Esta ação não pode ser desfeita.')) {
+    if (window.confirm('Tem certeza que deseja excluir TODOS os dados consolidados semanais? Esta ação não pode ser desfeita.')) {
       setLoading(true);
       try {
         const deleteBatch = writeBatch(db);
         data.forEach(item => {
-            deleteBatch.delete(doc(db, 'productivityData', item.id));
+            deleteBatch.delete(doc(db, 'productTotalZvSem', item.id));
         });
         await deleteBatch.commit();
         alert('Todos os dados foram excluídos.');
@@ -142,7 +140,7 @@ const DataLoading: React.FC<DataLoadingProps> = ({ setView }) => {
     <div className="w-full max-w-5xl bg-white p-8 rounded-xl shadow-lg space-y-6">
       <div className="flex justify-between items-center">
         <div>
-            <h1 className="text-2xl font-bold text-gray-800">Dados Diários Zona - Produtividade</h1>
+            <h1 className="text-2xl font-bold text-gray-800">Dados Consolidados Semanais - Produtividade</h1>
             <p className="text-sm text-gray-500">Importe, exporte ou exclua os dados do indicador.</p>
         </div>
         <button onClick={() => setView(View.DATA_LOADING_PRODUCTIVITY_SELECTION)} className="text-sm text-indigo-600 hover:underline">
@@ -175,7 +173,6 @@ const DataLoading: React.FC<DataLoadingProps> = ({ setView }) => {
               <th scope="col" className="px-6 py-3">Semana</th>
               <th scope="col" className="px-6 py-3">Área</th>
               <th scope="col" className="px-6 py-3">Zona</th>
-              <th scope="col" className="px-6 py-3">DVV</th>
               <th scope="col" className="px-6 py-3">Resultado</th>
               <th scope="col" className="px-6 py-3">(A/B)</th>
             </tr>
@@ -188,14 +185,13 @@ const DataLoading: React.FC<DataLoadingProps> = ({ setView }) => {
                     <td className="px-6 py-4">{row.semana}</td>
                     <td className="px-6 py-4">{row.area}</td>
                     <td className="px-6 py-4">{row.zona}</td>
-                    <td className="px-6 py-4">{row.dvv}</td>
                     <td className="px-6 py-4">{row.resultado}</td>
                     <td className="px-6 py-4">{row.ab}</td>
                 </tr>
                 ))
             ) : (
                 <tr>
-                    <td colSpan={7} className="text-center py-10 text-gray-500">Nenhum dado carregado.</td>
+                    <td colSpan={6} className="text-center py-10 text-gray-500">Nenhum dado carregado.</td>
                 </tr>
             )}
           </tbody>
@@ -206,4 +202,4 @@ const DataLoading: React.FC<DataLoadingProps> = ({ setView }) => {
   );
 };
 
-export default DataLoading;
+export default DataLoadingProductivityWeekly;

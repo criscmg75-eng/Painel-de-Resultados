@@ -14,6 +14,11 @@ import RankingPEScreen from './components/results/RankingPEScreen';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import PESelectionScreen from './components/cockpit/PESelectionScreen';
+import ProductivityDataSelectionScreen from './components/admin/ProductivityDataSelectionScreen';
+import EffectivenessDataSelectionScreen from './components/admin/EffectivenessDataSelectionScreen';
+import DataLoadingProductivityWeeklyZone from './components/admin/DataLoadingProductivityWeeklyZone';
+import DataLoadingProductivityDailyArea from './components/admin/DataLoadingProductivityDailyArea';
+import DataLoadingProductivityWeeklyArea from './components/admin/DataLoadingProductivityWeeklyArea';
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -73,10 +78,20 @@ const App: React.FC = () => {
         return <SystemParameters setView={setCurrentView} />;
       case View.DATA_LOADING_SELECTION:
         return <DataLoadingSelection setView={setCurrentView} />;
+      case View.DATA_LOADING_PRODUCTIVITY_SELECTION:
+        return <ProductivityDataSelectionScreen setView={setCurrentView} />;
+      case View.DATA_LOADING_EFFECTIVENESS_SELECTION:
+        return <EffectivenessDataSelectionScreen setView={setCurrentView} />;
       case View.DATA_LOADING:
         return <DataLoading setView={setCurrentView} />;
       case View.DATA_LOADING_EFFECTIVENESS:
         return <DataLoadingEffectiveness setView={setCurrentView} />;
+      case View.DATA_LOADING_PRODUCTIVITY_WEEKLY_ZONE:
+        return <DataLoadingProductivityWeeklyZone setView={setCurrentView} />;
+      case View.DATA_LOADING_PRODUCTIVITY_DAILY_AREA:
+        return <DataLoadingProductivityDailyArea setView={setCurrentView} />;
+      case View.DATA_LOADING_PRODUCTIVITY_WEEKLY_AREA:
+        return <DataLoadingProductivityWeeklyArea setView={setCurrentView} />;
       case View.COCKPIT:
         return <Cockpit user={currentUser!} onLogout={handleLogout} setView={setCurrentView} />;
       case View.PE_SELECTION:

@@ -142,10 +142,10 @@ const DataLoadingEffectiveness: React.FC<DataLoadingEffectivenessProps> = ({ set
     <div className="w-full max-w-5xl bg-white p-8 rounded-xl shadow-lg space-y-6">
       <div className="flex justify-between items-center">
         <div>
-            <h1 className="text-2xl font-bold text-gray-800">Carregamento de Dados - Efetividade</h1>
+            <h1 className="text-2xl font-bold text-gray-800">Dados Diários - Efetividade</h1>
             <p className="text-sm text-gray-500">Importe, exporte ou exclua os dados do indicador.</p>
         </div>
-        <button onClick={() => setView(View.DATA_LOADING_SELECTION)} className="text-sm text-indigo-600 hover:underline">
+        <button onClick={() => setView(View.DATA_LOADING_EFFECTIVENESS_SELECTION)} className="text-sm text-indigo-600 hover:underline">
           Voltar
         </button>
       </div>
