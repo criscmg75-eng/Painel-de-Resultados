@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { User, View, ProductivityData, EffectivenessData, SystemParameters } from '../../types';
+import { User, View, ProductivityData, EffectivenessData, SystemParameters, ProductTotalZvSemData, ProductTotalTvDiaData, ProductTotalTvSemData } from '../../types';
 import { db } from '../../firebase';
 import { collection, doc, getDoc, getDocs } from 'firebase/firestore';
 
@@ -14,39 +14,45 @@ interface PivotTableProps {
     data: GenericData[];
     target: number;
     title: string;
+    weeklyTotalsData?: ProductTotalZvSemData[];
+    dailyAreaTotalsData?: ProductTotalTvDiaData[];
+    weeklyAreaTotalData?: ProductTotalTvSemData[];
 }
 
-const PivotTable: React.FC<PivotTableProps> = ({ data, target, title }) => {
-    const pivotData = useMemo(() => {
-        if (data.length === 0) {
-            return { headers: [], rows: [] };
+const PivotTable: React.FC<PivotTableProps> = ({ data, target, title, weeklyTotalsData, dailyAreaTotalsData, weeklyAreaTotalData }) => {
+    const parseAB = (ab: string | undefined): { a: number, b: number } => {
+        if (!ab) return { a: 0, b: 0 };
+        const match = ab.match(/\((\d+)\/(\d+)\)/);
+        if (match) {
+            return { a: parseInt(match[1], 10), b: parseInt(match[2], 10) };
         }
+        return { a: 0, b: 0 };
+    };
 
+    const pivotData = useMemo(() => {
         const dvvHeaders = [...new Set(data.map(item => item.dvv))].sort();
         const zonas = [...new Set(data.map(item => item.zona))].sort();
 
         const rows = zonas.map(zona => {
             const dvvResults = dvvHeaders.reduce((acc, dvv) => {
                 const item = data.find(d => d.zona === zona && d.dvv === dvv);
-                if (item) {
-                    acc[dvv] = { resultado: item.resultado, ab: item.ab };
-                } else {
-                    acc[dvv] = null;
-                }
+                acc[dvv] = item ? { resultado: item.resultado, ab: item.ab } : null;
                 return acc;
             }, {} as Record<string, { resultado: string; ab: string } | null>);
             
+            const totalItem = weeklyTotalsData?.find(d => d.zona === zona);
             return {
                 zona,
                 dvvResults,
+                total: totalItem ? { resultado: totalItem.resultado, ab: totalItem.ab } : null
             };
         });
 
         return { headers: dvvHeaders, rows };
-    }, [data]);
+    }, [data, weeklyTotalsData]);
 
     const getResultClass = (resultStr: string, currentTarget: number) => {
-        const resultNum = parseFloat(resultStr);
+        const resultNum = parseFloat(resultStr.replace(',', '.'));
         if (isNaN(resultNum)) {
             return 'text-gray-900';
         }
@@ -61,32 +67,30 @@ const PivotTable: React.FC<PivotTableProps> = ({ data, target, title }) => {
                     <thead className="text-sm font-semibold text-gray-700 uppercase bg-gray-50">
                         <tr>
                             <th scope="col" className="px-4 py-3 text-left">ZONA</th>
-                            {pivotData.headers.map((dvv, colIndex) => (
-                                <th 
-                                    key={dvv} 
-                                    scope="col" 
-                                    className={`px-4 py-3 ${colIndex === pivotData.headers.length - 1 ? 'bg-gray-100' : ''}`}
-                                >
+                            {pivotData.headers.map(dvv => (
+                                <th key={dvv} scope="col" className="px-4 py-3">
                                     {dvv}
                                 </th>
                             ))}
+                             {(weeklyTotalsData || dailyAreaTotalsData) && (
+                                <th scope="col" className="px-4 py-3 font-bold bg-gray-100">
+                                    TOTAL
+                                </th>
+                            )}
                         </tr>
                     </thead>
                     <tbody>
                         {pivotData.rows.length > 0 ? (
-                            pivotData.rows.map((row, rowIndex) => {
-                                const isLastRow = rowIndex === pivotData.rows.length - 1;
-                                return (
+                            <>
+                                {pivotData.rows.map(row => (
                                     <tr key={row.zona} className="bg-white border-b hover:bg-gray-50">
-                                        <td className={`px-4 py-2 font-medium text-gray-900 whitespace-nowrap text-left ${isLastRow ? 'bg-gray-100' : ''}`}>
+                                        <td className="px-4 py-2 font-medium text-gray-900 whitespace-nowrap text-left">
                                             {row.zona}
                                         </td>
-                                        {pivotData.headers.map((dvv, colIndex) => {
-                                            const isLastColumn = colIndex === pivotData.headers.length - 1;
+                                        {pivotData.headers.map(dvv => {
                                             const cellData = row.dvvResults[dvv];
-                                            const cellClassName = `px-4 py-2 ${(isLastRow || isLastColumn) ? 'bg-gray-100' : ''}`;
                                             return (
-                                                <td key={`${row.zona}-${dvv}`} className={cellClassName}>
+                                                <td key={`${row.zona}-${dvv}`} className="px-4 py-2">
                                                     {cellData ? (
                                                         <div>
                                                             <span className={getResultClass(cellData.resultado, target)}>{cellData.resultado}</span>
@@ -96,12 +100,52 @@ const PivotTable: React.FC<PivotTableProps> = ({ data, target, title }) => {
                                                 </td>
                                             );
                                         })}
+                                        {weeklyTotalsData && (
+                                            <td className="px-4 py-2 bg-gray-100">
+                                                {row.total ? (
+                                                     <div>
+                                                        <span className={getResultClass(row.total.resultado, target)}>{row.total.resultado}</span>
+                                                        <span className="block text-xs text-gray-400">{row.total.ab}</span>
+                                                    </div>
+                                                ) : '-'}
+                                            </td>
+                                        )}
                                     </tr>
-                                )
-                            })
+                                ))}
+                                {(weeklyTotalsData || dailyAreaTotalsData) && (
+                                     <tr className="bg-gray-100 border-b">
+                                        <td className="px-4 py-2 font-medium text-gray-900 whitespace-nowrap text-left font-bold">
+                                            TOTAL
+                                        </td>
+                                        {pivotData.headers.map(dvv => {
+                                           const totalCellData = dailyAreaTotalsData?.find(d => d.dvv === dvv);
+                                           return (
+                                             <td key={`total-row-${dvv}`} className="px-4 py-2 font-bold">
+                                               {totalCellData ? (
+                                                 <div>
+                                                   <span className={getResultClass(totalCellData.resultado, target)}>{totalCellData.resultado}</span>
+                                                   <span className="block text-xs text-gray-400">{totalCellData.ab}</span>
+                                                 </div>
+                                               ) : '-'}
+                                             </td>
+                                           );
+                                        })}
+                                        {weeklyTotalsData && (
+                                            <td className="px-4 py-2 bg-gray-100">
+                                               {weeklyAreaTotalData && weeklyAreaTotalData[0] ? (
+                                                    <div>
+                                                        <span className={getResultClass(weeklyAreaTotalData[0].resultado, target)}>{weeklyAreaTotalData[0].resultado}</span>
+                                                        <span className="block text-xs text-gray-400">{weeklyAreaTotalData[0].ab}</span>
+                                                    </div>
+                                                ) : '-'}
+                                            </td>
+                                        )}
+                                    </tr>
+                                )}
+                            </>
                         ) : (
                             <tr>
-                                <td colSpan={pivotData.headers.length + 1} className="text-center py-10 text-gray-500">
+                                <td colSpan={pivotData.headers.length + 1 + (weeklyTotalsData ? 1 : 0)} className="text-center py-10 text-gray-500">
                                     Nenhum dado encontrado para os filtros selecionados.
                                 </td>
                             </tr>
@@ -116,6 +160,9 @@ const PivotTable: React.FC<PivotTableProps> = ({ data, target, title }) => {
 const PEResultsScreen: React.FC<PEResultsScreenProps> = ({ user, setView }) => {
   const [productivityData, setProductivityData] = useState<ProductivityData[]>([]);
   const [effectivenessData, setEffectivenessData] = useState<EffectivenessData[]>([]);
+  const [prodWeeklyZoneData, setProdWeeklyZoneData] = useState<ProductTotalZvSemData[]>([]);
+  const [prodDailyAreaData, setProdDailyAreaData] = useState<ProductTotalTvDiaData[]>([]);
+  const [prodWeeklyAreaData, setProdWeeklyAreaData] = useState<ProductTotalTvSemData[]>([]);
   const [systemParams, setSystemParams] = useState<SystemParameters>({ 
     produtividade: 95, 
     efetividade: 95, 
@@ -137,11 +184,17 @@ const PEResultsScreen: React.FC<PEResultsScreenProps> = ({ user, setView }) => {
             const paramsRef = doc(db, 'system', 'parameters');
             const prodRef = collection(db, 'productivityData');
             const effRef = collection(db, 'effectivenessData');
+            const prodWeeklyZoneRef = collection(db, 'productTotalZvSem');
+            const prodDailyAreaRef = collection(db, 'productTotalTvDia');
+            const prodWeeklyAreaRef = collection(db, 'productTotalTvSem');
 
-            const [paramsSnap, prodSnap, effSnap] = await Promise.all([
+            const [paramsSnap, prodSnap, effSnap, prodWeeklyZoneSnap, prodDailyAreaSnap, prodWeeklyAreaSnap] = await Promise.all([
                 getDoc(paramsRef),
                 getDocs(prodRef),
-                getDocs(effRef)
+                getDocs(effRef),
+                getDocs(prodWeeklyZoneRef),
+                getDocs(prodDailyAreaRef),
+                getDocs(prodWeeklyAreaRef),
             ]);
             
             let fetchedParams = systemParams;
@@ -155,10 +208,19 @@ const PEResultsScreen: React.FC<PEResultsScreenProps> = ({ user, setView }) => {
             
             const effData = effSnap.docs.map(d => ({ id: d.id, ...d.data() })) as EffectivenessData[];
             setEffectivenessData(effData);
+
+            const prodWeeklyData = prodWeeklyZoneSnap.docs.map(d => ({ id: d.id, ...d.data() })) as ProductTotalZvSemData[];
+            setProdWeeklyZoneData(prodWeeklyData);
+
+            const prodDailyData = prodDailyAreaSnap.docs.map(d => ({ id: d.id, ...d.data() })) as ProductTotalTvDiaData[];
+            setProdDailyAreaData(prodDailyData);
             
-            // Set initial filters after data is fetched
-            const allMonths = ['all', ...new Set([...prodData, ...effData].map(d => d.mes).filter(Boolean))];
-            const allWeeks = ['all', ...new Set([...prodData, ...effData].map(d => d.semana).filter(Boolean))];
+            const prodWeeklyAreaData = prodWeeklyAreaSnap.docs.map(d => ({ id: d.id, ...d.data() })) as ProductTotalTvSemData[];
+            setProdWeeklyAreaData(prodWeeklyAreaData);
+            
+            const allCombinedData = [...prodData, ...effData, ...prodWeeklyData, ...prodDailyData, ...prodWeeklyAreaData];
+            const allMonths = ['all', ...new Set(allCombinedData.map(d => d.mes).filter(Boolean))];
+            const allWeeks = ['all', ...new Set(allCombinedData.map(d => d.semana).filter(Boolean))];
             
             setSelectedMonth(allMonths.includes(fetchedParams.mesAtual) ? fetchedParams.mesAtual : 'all');
             setSelectedWeek(allWeeks.includes(fetchedParams.semanaAtual) ? fetchedParams.semanaAtual : 'all');
@@ -174,8 +236,11 @@ const PEResultsScreen: React.FC<PEResultsScreenProps> = ({ user, setView }) => {
 
   const userProdData = useMemo(() => productivityData.filter(d => d.area === user.area), [productivityData, user.area]);
   const userEffData = useMemo(() => effectivenessData.filter(d => d.area === user.area), [effectivenessData, user.area]);
+  const userProdWeeklyData = useMemo(() => prodWeeklyZoneData.filter(d => d.area === user.area), [prodWeeklyZoneData, user.area]);
+  const userProdDailyAreaData = useMemo(() => prodDailyAreaData.filter(d => d.area === user.area), [prodDailyAreaData, user.area]);
+  const userProdWeeklyAreaData = useMemo(() => prodWeeklyAreaData.filter(d => d.area === user.area), [prodWeeklyAreaData, user.area]);
   
-  const allData = useMemo(() => [...userProdData, ...userEffData], [userProdData, userEffData]);
+  const allData = useMemo(() => [...userProdData, ...userEffData, ...userProdWeeklyData, ...userProdDailyAreaData, ...userProdWeeklyAreaData], [userProdData, userEffData, userProdWeeklyData, userProdDailyAreaData, userProdWeeklyAreaData]);
   const months = useMemo(() => ['all', ...Array.from(new Set(allData.map(d => d.mes).filter(Boolean)))], [allData]);
   const weeks = useMemo(() => ['all', ...Array.from(new Set(allData.map(d => d.semana).filter(Boolean)))], [allData]);
 
@@ -192,6 +257,27 @@ const PEResultsScreen: React.FC<PEResultsScreenProps> = ({ user, setView }) => {
         (selectedWeek === 'all' || d.semana === selectedWeek)
     );
   }, [userEffData, selectedMonth, selectedWeek]);
+
+  const filteredProdWeeklyData = useMemo(() => {
+    return userProdWeeklyData.filter(d => 
+        (selectedMonth === 'all' || d.mes === selectedMonth) &&
+        (selectedWeek === 'all' || d.semana === selectedWeek)
+    );
+  }, [userProdWeeklyData, selectedMonth, selectedWeek]);
+
+  const filteredProdDailyAreaData = useMemo(() => {
+    return userProdDailyAreaData.filter(d => 
+        (selectedMonth === 'all' || d.mes === selectedMonth) &&
+        (selectedWeek === 'all' || d.semana === selectedWeek)
+    );
+  }, [userProdDailyAreaData, selectedMonth, selectedWeek]);
+
+  const filteredProdWeeklyAreaData = useMemo(() => {
+    return userProdWeeklyAreaData.filter(d => 
+        (selectedMonth === 'all' || d.mes === selectedMonth) &&
+        (selectedWeek === 'all' || d.semana === selectedWeek)
+    );
+  }, [userProdWeeklyAreaData, selectedMonth, selectedWeek]);
 
   const formattedUpdateDate = useMemo(() => {
     if (!systemParams.ultimaAtualizacao) return 'N/A';
@@ -225,7 +311,7 @@ const PEResultsScreen: React.FC<PEResultsScreenProps> = ({ user, setView }) => {
           <p className="text-sm text-gray-500">Exibindo resultados para a área: {user.area}</p>
           <p className="text-xs text-gray-400 mt-1">Última atualização: {formattedUpdateDate}</p>
         </div>
-        <button onClick={() => setView(View.COCKPIT)} className="text-sm text-indigo-600 hover:underline">
+        <button onClick={() => setView(View.PE_SELECTION)} className="text-sm text-indigo-600 hover:underline">
           Voltar
         </button>
       </div>
@@ -249,6 +335,9 @@ const PEResultsScreen: React.FC<PEResultsScreenProps> = ({ user, setView }) => {
         data={filteredProdData}
         target={systemParams.produtividade}
         title="Produtividade"
+        weeklyTotalsData={filteredProdWeeklyData}
+        dailyAreaTotalsData={filteredProdDailyAreaData}
+        weeklyAreaTotalData={filteredProdWeeklyAreaData}
       />
       
       <PivotTable 
