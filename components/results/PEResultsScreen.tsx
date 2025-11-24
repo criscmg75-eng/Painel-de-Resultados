@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { User, View, ProductivityData, EffectivenessData, SystemParameters, ProductTotalZvSemData, ProductTotalTvDiaData, ProductTotalTvSemData } from '../../types';
+import { User, View, ProductivityData, EffectivenessData, SystemParameters, ProductTotalZvSemData, ProductTotalTvDiaData, ProductTotalTvSemData, EffectTotalZvSemData, EffectTotalTvDiaData, EffectTotalTvSemData } from '../../types';
 import { db } from '../../firebase';
 import { collection, doc, getDoc, getDocs } from 'firebase/firestore';
 
@@ -14,9 +14,9 @@ interface PivotTableProps {
     data: GenericData[];
     target: number;
     title: string;
-    weeklyTotalsData?: ProductTotalZvSemData[];
-    dailyAreaTotalsData?: ProductTotalTvDiaData[];
-    weeklyAreaTotalData?: ProductTotalTvSemData[];
+    weeklyTotalsData?: (ProductTotalZvSemData | EffectTotalZvSemData)[];
+    dailyAreaTotalsData?: (ProductTotalTvDiaData | EffectTotalTvDiaData)[];
+    weeklyAreaTotalData?: (ProductTotalTvSemData | EffectTotalTvSemData)[];
 }
 
 const PivotTable: React.FC<PivotTableProps> = ({ data, target, title, weeklyTotalsData, dailyAreaTotalsData, weeklyAreaTotalData }) => {
@@ -163,6 +163,9 @@ const PEResultsScreen: React.FC<PEResultsScreenProps> = ({ user, setView }) => {
   const [prodWeeklyZoneData, setProdWeeklyZoneData] = useState<ProductTotalZvSemData[]>([]);
   const [prodDailyAreaData, setProdDailyAreaData] = useState<ProductTotalTvDiaData[]>([]);
   const [prodWeeklyAreaData, setProdWeeklyAreaData] = useState<ProductTotalTvSemData[]>([]);
+  const [effWeeklyZoneData, setEffWeeklyZoneData] = useState<EffectTotalZvSemData[]>([]);
+  const [effDailyAreaData, setEffDailyAreaData] = useState<EffectTotalTvDiaData[]>([]);
+  const [effWeeklyAreaData, setEffWeeklyAreaData] = useState<EffectTotalTvSemData[]>([]);
   const [systemParams, setSystemParams] = useState<SystemParameters>({ 
     produtividade: 95, 
     efetividade: 95, 
@@ -181,44 +184,68 @@ const PEResultsScreen: React.FC<PEResultsScreenProps> = ({ user, setView }) => {
     const fetchData = async () => {
         setLoading(true);
         try {
+            // Refs
             const paramsRef = doc(db, 'system', 'parameters');
             const prodRef = collection(db, 'productivityData');
             const effRef = collection(db, 'effectivenessData');
             const prodWeeklyZoneRef = collection(db, 'productTotalZvSem');
             const prodDailyAreaRef = collection(db, 'productTotalTvDia');
             const prodWeeklyAreaRef = collection(db, 'productTotalTvSem');
+            const effWeeklyZoneRef = collection(db, 'effectTotalZvSem');
+            const effDailyAreaRef = collection(db, 'effectTotalTvDia');
+            const effWeeklyAreaRef = collection(db, 'effectTotalTvSem');
 
-            const [paramsSnap, prodSnap, effSnap, prodWeeklyZoneSnap, prodDailyAreaSnap, prodWeeklyAreaSnap] = await Promise.all([
+            const [
+                paramsSnap,
+                prodSnap,
+                effSnap,
+                prodWeeklyZoneSnap,
+                prodDailyAreaSnap,
+                prodWeeklyAreaSnap,
+                effWeeklyZoneSnap,
+                effDailyAreaSnap,
+                effWeeklyAreaSnap
+            ] = await Promise.all([
                 getDoc(paramsRef),
                 getDocs(prodRef),
                 getDocs(effRef),
                 getDocs(prodWeeklyZoneRef),
                 getDocs(prodDailyAreaRef),
                 getDocs(prodWeeklyAreaRef),
+                getDocs(effWeeklyZoneRef),
+                getDocs(effDailyAreaRef),
+                getDocs(effWeeklyAreaRef),
             ]);
             
+            // System Params
             let fetchedParams = systemParams;
             if (paramsSnap.exists()) {
                 fetchedParams = { ...systemParams, ...paramsSnap.data() } as SystemParameters;
                 setSystemParams(fetchedParams);
             }
 
+            // Productivity Data
             const prodData = prodSnap.docs.map(d => ({ id: d.id, ...d.data() })) as ProductivityData[];
             setProductivityData(prodData);
-            
-            const effData = effSnap.docs.map(d => ({ id: d.id, ...d.data() })) as EffectivenessData[];
-            setEffectivenessData(effData);
-
             const prodWeeklyData = prodWeeklyZoneSnap.docs.map(d => ({ id: d.id, ...d.data() })) as ProductTotalZvSemData[];
             setProdWeeklyZoneData(prodWeeklyData);
-
             const prodDailyData = prodDailyAreaSnap.docs.map(d => ({ id: d.id, ...d.data() })) as ProductTotalTvDiaData[];
             setProdDailyAreaData(prodDailyData);
-            
             const prodWeeklyAreaData = prodWeeklyAreaSnap.docs.map(d => ({ id: d.id, ...d.data() })) as ProductTotalTvSemData[];
             setProdWeeklyAreaData(prodWeeklyAreaData);
             
-            const allCombinedData = [...prodData, ...effData, ...prodWeeklyData, ...prodDailyData, ...prodWeeklyAreaData];
+            // Effectiveness Data
+            const effData = effSnap.docs.map(d => ({ id: d.id, ...d.data() })) as EffectivenessData[];
+            setEffectivenessData(effData);
+            const effWeeklyData = effWeeklyZoneSnap.docs.map(d => ({ id: d.id, ...d.data() })) as EffectTotalZvSemData[];
+            setEffWeeklyZoneData(effWeeklyData);
+            const effDailyData = effDailyAreaSnap.docs.map(d => ({ id: d.id, ...d.data() })) as EffectTotalTvDiaData[];
+            setEffDailyAreaData(effDailyData);
+            const effWeeklyAreaData = effWeeklyAreaSnap.docs.map(d => ({ id: d.id, ...d.data() })) as EffectTotalTvSemData[];
+            setEffWeeklyAreaData(effWeeklyAreaData);
+            
+            // Set Filters
+            const allCombinedData = [...prodData, ...effData];
             const allMonths = ['all', ...new Set(allCombinedData.map(d => d.mes).filter(Boolean))];
             const allWeeks = ['all', ...new Set(allCombinedData.map(d => d.semana).filter(Boolean))];
             
@@ -234,50 +261,30 @@ const PEResultsScreen: React.FC<PEResultsScreenProps> = ({ user, setView }) => {
     fetchData();
   }, []);
 
+  // Filter Data by User Area
   const userProdData = useMemo(() => productivityData.filter(d => d.area === user.area), [productivityData, user.area]);
   const userEffData = useMemo(() => effectivenessData.filter(d => d.area === user.area), [effectivenessData, user.area]);
   const userProdWeeklyData = useMemo(() => prodWeeklyZoneData.filter(d => d.area === user.area), [prodWeeklyZoneData, user.area]);
   const userProdDailyAreaData = useMemo(() => prodDailyAreaData.filter(d => d.area === user.area), [prodDailyAreaData, user.area]);
   const userProdWeeklyAreaData = useMemo(() => prodWeeklyAreaData.filter(d => d.area === user.area), [prodWeeklyAreaData, user.area]);
+  const userEffWeeklyData = useMemo(() => effWeeklyZoneData.filter(d => d.area === user.area), [effWeeklyZoneData, user.area]);
+  const userEffDailyAreaData = useMemo(() => effDailyAreaData.filter(d => d.area === user.area), [effDailyAreaData, user.area]);
+  const userEffWeeklyAreaData = useMemo(() => effWeeklyAreaData.filter(d => d.area === user.area), [effWeeklyAreaData, user.area]);
   
-  const allData = useMemo(() => [...userProdData, ...userEffData, ...userProdWeeklyData, ...userProdDailyAreaData, ...userProdWeeklyAreaData], [userProdData, userEffData, userProdWeeklyData, userProdDailyAreaData, userProdWeeklyAreaData]);
+  const allData = useMemo(() => [...userProdData, ...userEffData], [userProdData, userEffData]);
   const months = useMemo(() => ['all', ...Array.from(new Set(allData.map(d => d.mes).filter(Boolean)))], [allData]);
   const weeks = useMemo(() => ['all', ...Array.from(new Set(allData.map(d => d.semana).filter(Boolean)))], [allData]);
 
-  const filteredProdData = useMemo(() => {
-    return userProdData.filter(d => 
-        (selectedMonth === 'all' || d.mes === selectedMonth) &&
-        (selectedWeek === 'all' || d.semana === selectedWeek)
-    );
-  }, [userProdData, selectedMonth, selectedWeek]);
-        
-  const filteredEffData = useMemo(() => {
-    return userEffData.filter(d => 
-        (selectedMonth === 'all' || d.mes === selectedMonth) &&
-        (selectedWeek === 'all' || d.semana === selectedWeek)
-    );
-  }, [userEffData, selectedMonth, selectedWeek]);
+  // Filter Data by Month/Week Selections
+  const filteredProdData = useMemo(() => userProdData.filter(d => (selectedMonth === 'all' || d.mes === selectedMonth) && (selectedWeek === 'all' || d.semana === selectedWeek)), [userProdData, selectedMonth, selectedWeek]);
+  const filteredEffData = useMemo(() => userEffData.filter(d => (selectedMonth === 'all' || d.mes === selectedMonth) && (selectedWeek === 'all' || d.semana === selectedWeek)), [userEffData, selectedMonth, selectedWeek]);
+  const filteredProdWeeklyData = useMemo(() => userProdWeeklyData.filter(d => (selectedMonth === 'all' || d.mes === selectedMonth) && (selectedWeek === 'all' || d.semana === selectedWeek)), [userProdWeeklyData, selectedMonth, selectedWeek]);
+  const filteredProdDailyAreaData = useMemo(() => userProdDailyAreaData.filter(d => (selectedMonth === 'all' || d.mes === selectedMonth) && (selectedWeek === 'all' || d.semana === selectedWeek)), [userProdDailyAreaData, selectedMonth, selectedWeek]);
+  const filteredProdWeeklyAreaData = useMemo(() => userProdWeeklyAreaData.filter(d => (selectedMonth === 'all' || d.mes === selectedMonth) && (selectedWeek === 'all' || d.semana === selectedWeek)), [userProdWeeklyAreaData, selectedMonth, selectedWeek]);
+  const filteredEffWeeklyData = useMemo(() => userEffWeeklyData.filter(d => (selectedMonth === 'all' || d.mes === selectedMonth) && (selectedWeek === 'all' || d.semana === selectedWeek)), [userEffWeeklyData, selectedMonth, selectedWeek]);
+  const filteredEffDailyAreaData = useMemo(() => userEffDailyAreaData.filter(d => (selectedMonth === 'all' || d.mes === selectedMonth) && (selectedWeek === 'all' || d.semana === selectedWeek)), [userEffDailyAreaData, selectedMonth, selectedWeek]);
+  const filteredEffWeeklyAreaData = useMemo(() => userEffWeeklyAreaData.filter(d => (selectedMonth === 'all' || d.mes === selectedMonth) && (selectedWeek === 'all' || d.semana === selectedWeek)), [userEffWeeklyAreaData, selectedMonth, selectedWeek]);
 
-  const filteredProdWeeklyData = useMemo(() => {
-    return userProdWeeklyData.filter(d => 
-        (selectedMonth === 'all' || d.mes === selectedMonth) &&
-        (selectedWeek === 'all' || d.semana === selectedWeek)
-    );
-  }, [userProdWeeklyData, selectedMonth, selectedWeek]);
-
-  const filteredProdDailyAreaData = useMemo(() => {
-    return userProdDailyAreaData.filter(d => 
-        (selectedMonth === 'all' || d.mes === selectedMonth) &&
-        (selectedWeek === 'all' || d.semana === selectedWeek)
-    );
-  }, [userProdDailyAreaData, selectedMonth, selectedWeek]);
-
-  const filteredProdWeeklyAreaData = useMemo(() => {
-    return userProdWeeklyAreaData.filter(d => 
-        (selectedMonth === 'all' || d.mes === selectedMonth) &&
-        (selectedWeek === 'all' || d.semana === selectedWeek)
-    );
-  }, [userProdWeeklyAreaData, selectedMonth, selectedWeek]);
 
   const formattedUpdateDate = useMemo(() => {
     if (!systemParams.ultimaAtualizacao) return 'N/A';
@@ -344,6 +351,9 @@ const PEResultsScreen: React.FC<PEResultsScreenProps> = ({ user, setView }) => {
         data={filteredEffData}
         target={systemParams.efetividade}
         title="Efetividade"
+        weeklyTotalsData={filteredEffWeeklyData}
+        dailyAreaTotalsData={filteredEffDailyAreaData}
+        weeklyAreaTotalData={filteredEffWeeklyAreaData}
       />
     </div>
   );
