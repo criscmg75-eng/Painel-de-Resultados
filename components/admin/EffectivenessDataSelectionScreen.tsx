@@ -40,21 +40,27 @@ const EffectivenessDataSelectionScreen: React.FC<EffectivenessDataSelectionScree
       <div className="space-y-4">
         <Card
           icon={<DocumentTextIcon />}
-          title="Dados diários"
+          title="Dados Diários Zona"
           description="Carregue os dados detalhados por dia e DVV."
           onClick={() => setView(View.DATA_LOADING_EFFECTIVENESS)}
         />
         <Card
           icon={<CollectionIcon />}
-          title="Dados Consolidados Semanais"
-          description="Carregue os totais consolidados por semana."
-          onClick={() => alert('Funcionalidade ainda não implementada.')}
+          title="Dados Semanais Zona"
+          description="Carregue os dados semanais por zona."
+          onClick={() => setView(View.DATA_LOADING_EFFECTIVENESS_WEEKLY_ZONE)}
         />
         <Card
           icon={<GlobeAltIcon />}
-          title="Dados Consolidados Área"
+          title="Dados Diários Área"
+          description="Carregue os totais diários para a área."
+          onClick={() => setView(View.DATA_LOADING_EFFECTIVENESS_DAILY_AREA)}
+        />
+        <Card
+          icon={<GlobeAltIcon />}
+          title="Dados Semanais Área"
           description="Carregue os totais consolidados para a área."
-          onClick={() => alert('Funcionalidade ainda não implementada.')}
+          onClick={() => setView(View.DATA_LOADING_EFFECTIVENESS_WEEKLY_AREA)}
         />
       </div>
     </div>

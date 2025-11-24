@@ -19,6 +19,9 @@ import EffectivenessDataSelectionScreen from './components/admin/EffectivenessDa
 import DataLoadingProductivityWeeklyZone from './components/admin/DataLoadingProductivityWeeklyZone';
 import DataLoadingProductivityDailyArea from './components/admin/DataLoadingProductivityDailyArea';
 import DataLoadingProductivityWeeklyArea from './components/admin/DataLoadingProductivityWeeklyArea';
+import DataLoadingEffectivenessWeeklyZone from './components/admin/DataLoadingEffectivenessWeeklyZone';
+import DataLoadingEffectivenessDailyArea from './components/admin/DataLoadingEffectivenessDailyArea';
+import DataLoadingEffectivenessWeeklyArea from './components/admin/DataLoadingEffectivenessWeeklyArea';
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -92,6 +95,12 @@ const App: React.FC = () => {
         return <DataLoadingProductivityDailyArea setView={setCurrentView} />;
       case View.DATA_LOADING_PRODUCTIVITY_WEEKLY_AREA:
         return <DataLoadingProductivityWeeklyArea setView={setCurrentView} />;
+      case View.DATA_LOADING_EFFECTIVENESS_WEEKLY_ZONE:
+        return <DataLoadingEffectivenessWeeklyZone setView={setCurrentView} />;
+      case View.DATA_LOADING_EFFECTIVENESS_DAILY_AREA:
+        return <DataLoadingEffectivenessDailyArea setView={setCurrentView} />;
+      case View.DATA_LOADING_EFFECTIVENESS_WEEKLY_AREA:
+        return <DataLoadingEffectivenessWeeklyArea setView={setCurrentView} />;
       case View.COCKPIT:
         return <Cockpit user={currentUser!} onLogout={handleLogout} setView={setCurrentView} />;
       case View.PE_SELECTION:

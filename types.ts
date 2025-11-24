@@ -68,6 +68,35 @@ export interface ProductTotalTvSemData {
   ab: string; // (A/B)
 }
 
+export interface EffectTotalZvSemData {
+  id: string;
+  mes: string;
+  semana: string;
+  area: string;
+  zona: string;
+  resultado: string;
+  ab: string; // (A/B)
+}
+
+export interface EffectTotalTvDiaData {
+  id: string;
+  mes: string;
+  semana: string;
+  area: string;
+  dvv: string;
+  resultado: string;
+  ab: string; // (A/B)
+}
+
+export interface EffectTotalTvSemData {
+  id: string;
+  mes: string;
+  semana: string;
+  area: string;
+  resultado: string;
+  ab: string; // (A/B)
+}
+
 
 export enum View {
   LOGIN = 'LOGIN',
@@ -83,6 +112,9 @@ export enum View {
   DATA_LOADING_PRODUCTIVITY_WEEKLY_ZONE = 'DATA_LOADING_PRODUCTIVITY_WEEKLY_ZONE',
   DATA_LOADING_PRODUCTIVITY_DAILY_AREA = 'DATA_LOADING_PRODUCTIVITY_DAILY_AREA',
   DATA_LOADING_PRODUCTIVITY_WEEKLY_AREA = 'DATA_LOADING_PRODUCTIVITY_WEEKLY_AREA',
+  DATA_LOADING_EFFECTIVENESS_WEEKLY_ZONE = 'DATA_LOADING_EFFECTIVENESS_WEEKLY_ZONE',
+  DATA_LOADING_EFFECTIVENESS_DAILY_AREA = 'DATA_LOADING_EFFECTIVENESS_DAILY_AREA',
+  DATA_LOADING_EFFECTIVENESS_WEEKLY_AREA = 'DATA_LOADING_EFFECTIVENESS_WEEKLY_AREA',
   COCKPIT = 'COCKPIT',
   PE_SELECTION = 'PE_SELECTION',
   PE_RESULTS = 'PE_RESULTS',
